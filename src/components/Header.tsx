@@ -1,5 +1,4 @@
 import { Avatar, Button, Space, Typography } from 'antd';
-import { createWalletStore } from '../stores/CreateWalletStore';
 import { settingsStore } from '../stores/SettingsStore';
 
 const { Text } = Typography;
@@ -36,9 +35,6 @@ export default function Header() {
 
       {/* 右：用户区 */}
       <Space size={8} style={{ flexShrink: 0 }}>
-        <Button type="primary" size="small" onClick={() => void createWalletStore.open()}>
-          创建
-        </Button>
         <Button size="small" onClick={() => settingsStore.openSettings()}>
           设置
         </Button>
