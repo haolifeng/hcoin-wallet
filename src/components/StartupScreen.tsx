@@ -6,7 +6,9 @@ const { Title, Text } = Typography;
 
 const STATUS_TEXT: Record<StartupPhase, string> = {
   checking: '正在检查本地钱包数据…',
-  create: '未检测到助记词，请先创建钱包',
+  choose: '未检测到助记词，请选择创建或导入',
+  create: '正在创建新的助记词钱包…',
+  import: '正在导入已有助记词…',
   unlock: '已检测到助记词，请输入密码解锁',
   ready: '',
 };

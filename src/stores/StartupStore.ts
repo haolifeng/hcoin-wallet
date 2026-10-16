@@ -1,17 +1,26 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { menuStore } from './MenuStore';
 import { createWalletStore } from './CreateWalletStore';
+import { importWalletStore } from './ImportWalletStore';
 import type { AccountBrief } from './SettingsStore';
 import type { UnlockResult } from '../types/global';
 
 /**
  * 启动流程阶段：
  * - checking：正在检测本地数据库是否已有助记词
+ * - choose  ：无助记词，让用户选择「创建」还是「导入」
  * - create  ：无助记词，弹窗引导创建（与「创建」按钮同一套逻辑）
+ * - import  ：无助记词，弹窗引导导入已有 12 词助记词
  * - unlock  ：已有助记词，弹窗输入密码解锁
  * - ready   ：已完成，进入主界面
  */
-export type StartupPhase = 'checking' | 'create' | 'unlock' | 'ready';
+export type StartupPhase =
+  | 'checking'
+  | 'choose'
+  | 'create'
+  | 'import'
+  | 'unlock'
+  | 'ready';
 
 class StartupStore {
   phase: StartupPhase = 'checking';
@@ -52,11 +61,10 @@ class StartupStore {
     try {
       const state = await api.hasMnemonic();
       if (!state.exists) {
-        // 数据库中没有助记词：复用创建钱包向导，标记为启动流程（不可取消）
+        // 数据库中没有助记词：先让用户选择「创建」还是「导入」
         runInAction(() => {
-          this.phase = 'create';
+          this.phase = 'choose';
         });
-        await createWalletStore.open(true);
         return;
       }
 
@@ -77,6 +85,22 @@ class StartupStore {
         this.loading = false;
       });
     }
+  }
+
+  /** 启动选择：创建新的助记词（复用「创建」按钮的向导逻辑，不可取消） */
+  async chooseCreate(): Promise<void> {
+    runInAction(() => {
+      this.phase = 'create';
+    });
+    await createWalletStore.open(true);
+  }
+
+  /** 启动选择：导入已有的 12 词助记词 */
+  chooseImport(): void {
+    runInAction(() => {
+      this.phase = 'import';
+    });
+    importWalletStore.open(true);
   }
 
   setPassword(value: string): void {

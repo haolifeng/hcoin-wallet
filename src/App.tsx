@@ -9,7 +9,9 @@ import CreateWalletModal from './components/CreateWalletModal';
 import SettingsModal from './components/SettingsModal';
 import BackupModal from './components/BackupModal';
 import StartupScreen from './components/StartupScreen';
+import StartupChoiceModal from './components/StartupChoiceModal';
 import UnlockModal from './components/UnlockModal';
+import ImportWalletModal from './components/ImportWalletModal';
 import { startupStore } from './stores/StartupStore';
 
 const { Header: AHeader, Content, Footer: AFooter, Sider } = Layout;
@@ -124,10 +126,14 @@ export default function App() {
       <SettingsModal />
       <BackupModal />
 
-      {/* 启动界面：未完成创建/解锁前覆盖在主界面之上 */}
+      {/* 启动界面：未完成创建/导入/解锁前覆盖在主界面之上 */}
       <StartupScreen />
+      {/* 无助记词时的「创建 / 导入」选择窗口 */}
+      <StartupChoiceModal />
       {/* 已有助记词时的密码解锁窗口 */}
       <UnlockModal />
+      {/* 导入助记词向导 */}
+      <ImportWalletModal />
     </Layout>
   );
 }

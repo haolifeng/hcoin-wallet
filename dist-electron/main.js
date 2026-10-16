@@ -22154,6 +22154,9 @@ electron.app.whenReady().then(async () => {
   electron.ipcMain.handle("wallet:generateMnemonic", () => {
     return generateMnemonic();
   });
+  electron.ipcMain.handle("wallet:validateMnemonic", (_event, mnemonic) => {
+    return isValidMnemonic(mnemonic);
+  });
   electron.ipcMain.handle("wallet:createAccount", (_event, mnemonic, password) => {
     return createAccount(mnemonic, password);
   });

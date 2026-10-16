@@ -21,6 +21,7 @@ declare global {
       getBalance: (address: string) => Promise<number>;
       getSectionData: (section: string) => Promise<SectionRow[]>;
       generateMnemonic: () => Promise<string>;
+      validateMnemonic: (mnemonic: string) => Promise<boolean>;
       createAccount: (
         mnemonic: string,
         password: string,

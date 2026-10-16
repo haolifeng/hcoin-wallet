@@ -5,6 +5,7 @@ import {
   queryBalance,
   querySectionData,
   generateMnemonic,
+  isValidMnemonic,
   createAccount,
   listAccounts,
   decryptMnemonic,
@@ -65,7 +66,13 @@ app.whenReady().then(async () => {
     return generateMnemonic();
   });
 
+  // IPC：校验助记词是否合法（导入助记词时使用，词库只在主进程）
+  ipcMain.handle('wallet:validateMnemonic', (_event, mnemonic: string) => {
+    return isValidMnemonic(mnemonic);
+  });
+
   // IPC：创建账户（助记词 + 密码 → 主进程加密后写入 LevelDB，仅回传地址）
+  // 创建与导入共用：导入时传入的是用户已有的助记词，同样加密落盘并派生 ETH 账户
   ipcMain.handle('wallet:createAccount', (_event, mnemonic: string, password: string) => {
     return createAccount(mnemonic, password);
   });

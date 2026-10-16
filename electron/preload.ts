@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('walletAPI', {
     ipcRenderer.invoke('wallet:getSectionData', section),
   generateMnemonic: () =>
     ipcRenderer.invoke('wallet:generateMnemonic'),
+  validateMnemonic: (mnemonic: string) =>
+    ipcRenderer.invoke('wallet:validateMnemonic', mnemonic),
   createAccount: (mnemonic: string, password: string) =>
     ipcRenderer.invoke('wallet:createAccount', mnemonic, password),
   listAccounts: () => ipcRenderer.invoke('wallet:listAccounts'),
