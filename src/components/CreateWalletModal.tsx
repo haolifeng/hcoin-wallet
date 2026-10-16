@@ -1,6 +1,7 @@
 import { Alert, Button, Col, Input, Modal, Row, Spin, Typography, message } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { createWalletStore } from '../stores/CreateWalletStore';
+import { startupStore } from '../stores/StartupStore';
 
 const { Text, Paragraph } = Typography;
 
@@ -11,8 +12,10 @@ const CreateWalletModal = observer(() => {
 
   const handleSubmit = async () => {
     try {
-      const address = await store.submit();
-      message.success(`账户创建成功，地址：${address}`);
+      const result = await store.submit();
+      message.success(`账户创建成功，ETH 账户：${result.ethAddress}`);
+      // 记录当前账户（启动流程中还会由此放行进入主界面）
+      startupStore.markCreated(result);
       store.close();
     } catch (err) {
       message.error(err instanceof Error ? err.message : '创建账户失败');
@@ -22,6 +25,15 @@ const CreateWalletModal = observer(() => {
   /** 第一步：展示 12 个助记词（按钮形式）+ 保存提示 */
   const renderMnemonicStep = () => (
     <>
+      {store.startup && (
+        <Alert
+          type="info"
+          showIcon
+          message="欢迎使用 HCoinWallet"
+          description="本机尚未创建助记词，请先完成下方步骤创建钱包。助记词将加密保存在本机数据库中。"
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Alert
         type="warning"
         showIcon
@@ -135,7 +147,8 @@ const CreateWalletModal = observer(() => {
     1: (
       <>
         {/* 注意：mobx 的 makeAutoObservable 不会绑定原型方法，必须用箭头函数包裹调用 */}
-        <Button onClick={() => store.close()}>取消</Button>
+        {/* 启动流程中不允许取消，用户必须完成创建才能进入主界面 */}
+        {!store.startup && <Button onClick={() => store.close()}>取消</Button>}
         <Button
           type="primary"
           disabled={store.mnemonic.length === 0 || store.loading}
@@ -180,7 +193,11 @@ const CreateWalletModal = observer(() => {
       title={`创建钱包 · ${STEP_TITLES[store.step - 1]}`}
       width={560}
       maskClosable={false}
-      onCancel={() => store.close()}
+      closable={!store.startup}
+      keyboard={!store.startup}
+      onCancel={() => {
+        if (!store.startup) store.close();
+      }}
       footer={footers[store.step]}
     >
       {store.error && (

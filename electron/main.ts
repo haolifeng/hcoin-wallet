@@ -8,6 +8,8 @@ import {
   createAccount,
   listAccounts,
   decryptMnemonic,
+  hasMnemonic,
+  unlockAccount,
   closeDatabase,
 } from './db';
 
@@ -76,6 +78,16 @@ app.whenReady().then(async () => {
   // IPC：备份助记词（用密码解密数据库中保存的密文，仅在用户输入正确密码后回传明文）
   ipcMain.handle('wallet:backupMnemonic', (_event, address: string, password: string) => {
     return decryptMnemonic(address, password);
+  });
+
+  // IPC：启动检测——数据库里是否已存在加密助记词
+  ipcMain.handle('wallet:hasMnemonic', () => {
+    return hasMnemonic();
+  });
+
+  // IPC：解锁钱包（密码 → 解密助记词 → 派生 ETH 账户，仅回传两个地址）
+  ipcMain.handle('wallet:unlockWallet', (_event, address: string, password: string) => {
+    return unlockAccount(address, password);
   });
 
   // 说明：不实现 Tray / 后台常驻。macOS 上不再依赖 `activate` 重建窗口，

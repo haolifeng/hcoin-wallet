@@ -3,6 +3,7 @@ const electron = require("electron");
 const path = require("node:path");
 const classicLevel = require("classic-level");
 const require$$0$1 = require("node:crypto");
+const ethers = require("ethers");
 var src = {};
 var sha256 = {};
 var sha2 = {};
@@ -21857,6 +21858,20 @@ function getDefaultWordlist() {
 src.getDefaultWordlist = getDefaultWordlist;
 var _wordlists_2 = _wordlists;
 src.wordlists = _wordlists_2.wordlists;
+const ETH_DERIVE_PATH = "m/44'/60'/0'/0/0";
+function deriveEthAccount(mnemonic) {
+  const phrase = mnemonic.trim().toLowerCase();
+  if (!ethers.Mnemonic.isValidMnemonic(phrase)) {
+    throw new Error("助记词不合法，无法派生 ETH 账户");
+  }
+  const wallet = ethers.HDNodeWallet.fromPhrase(phrase, void 0, ETH_DERIVE_PATH);
+  return {
+    address: wallet.address,
+    publicKey: wallet.publicKey,
+    path: ETH_DERIVE_PATH,
+    privateKey: wallet.privateKey
+  };
+}
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
 const KEY_LENGTH = 32;
 let db;
@@ -21925,13 +21940,16 @@ async function createAccount(mnemonic, password) {
     throw new Error("该账户已存在");
   }
   const secret = encryptMnemonic(mnemonic, password);
+  const eth = deriveEthAccount(mnemonic);
   await db.put(accountKey(address), {
     address,
     balance: 0,
     createdAt: Date.now(),
-    secret
+    secret,
+    ethAddress: eth.address,
+    ethPath: eth.path
   });
-  return { address };
+  return { address, ethAddress: eth.address };
 }
 async function listAccounts() {
   if (!db || db.status !== "open") {
@@ -21943,10 +21961,45 @@ async function listAccounts() {
     accounts.push({
       address: account.address,
       createdAt: account.createdAt,
-      hasSecret: Boolean(account.secret)
+      hasSecret: Boolean(account.secret),
+      ethAddress: account.ethAddress
     });
   }
   return accounts.sort((a, b) => a.createdAt - b.createdAt);
+}
+async function hasMnemonic() {
+  if (!db || db.status !== "open") {
+    throw new Error("数据库尚未就绪，无法检查助记词");
+  }
+  let first = null;
+  for await (const [key, account] of db.iterator()) {
+    if (!key.startsWith("account:")) continue;
+    if (!account.secret) continue;
+    if (!first || account.createdAt < first.createdAt) {
+      first = { address: account.address, createdAt: account.createdAt };
+    }
+  }
+  return { exists: Boolean(first), address: (first == null ? void 0 : first.address) ?? null };
+}
+async function unlockAccount(address, password) {
+  if (!db || db.status !== "open") {
+    throw new Error("数据库尚未就绪，无法解锁账户");
+  }
+  if (!address) {
+    throw new Error("请选择要解锁的账户");
+  }
+  const mnemonic = await decryptMnemonic(address, password);
+  const account = await db.get(accountKey(address)).catch(() => null);
+  if (!account) {
+    throw new Error("账户不存在");
+  }
+  let ethAddress = account.ethAddress;
+  if (!ethAddress) {
+    const eth = deriveEthAccount(mnemonic);
+    ethAddress = eth.address;
+    await db.put(accountKey(address), { ...account, ethAddress, ethPath: eth.path });
+  }
+  return { address, ethAddress };
 }
 async function decryptMnemonic(address, password) {
   if (!db || db.status !== "open") {
@@ -22109,6 +22162,12 @@ electron.app.whenReady().then(async () => {
   });
   electron.ipcMain.handle("wallet:backupMnemonic", (_event, address, password) => {
     return decryptMnemonic(address, password);
+  });
+  electron.ipcMain.handle("wallet:hasMnemonic", () => {
+    return hasMnemonic();
+  });
+  electron.ipcMain.handle("wallet:unlockWallet", (_event, address, password) => {
+    return unlockAccount(address, password);
   });
 });
 electron.app.on("window-all-closed", () => {

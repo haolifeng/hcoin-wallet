@@ -1,6 +1,7 @@
 import { Table, Typography, Alert, Spin } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { menuStore } from '../stores/MenuStore';
+import EthAccountCard from './EthAccountCard';
 
 const { Title } = Typography;
 
@@ -36,6 +37,9 @@ const ContentPanel = observer(() => {
   return (
     <div>
       <Title level={3}>{menuStore.currentLabel}</Title>
+
+      {/* 解锁后展示由助记词派生的 ETH 账户 */}
+      <EthAccountCard />
 
       {menuStore.error && (
         <Alert type="error" showIcon message={menuStore.error} style={{ marginBottom: 16 }} />

@@ -12,4 +12,7 @@ contextBridge.exposeInMainWorld('walletAPI', {
   listAccounts: () => ipcRenderer.invoke('wallet:listAccounts'),
   backupMnemonic: (address: string, password: string) =>
     ipcRenderer.invoke('wallet:backupMnemonic', address, password),
+  hasMnemonic: () => ipcRenderer.invoke('wallet:hasMnemonic'),
+  unlockWallet: (address: string, password: string) =>
+    ipcRenderer.invoke('wallet:unlockWallet', address, password),
 });

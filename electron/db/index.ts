@@ -9,6 +9,7 @@ import {
 import path from 'node:path';
 import { app } from 'electron';
 import { generateMnemonic as generateBip39Mnemonic, validateMnemonic } from 'bip39';
+import { deriveEthAccount } from '../eth';
 
 /** 助记词对称加密后的密文结构（只落盘密文，明文永不写入数据库） */
 export interface EncryptedSecret {
@@ -31,6 +32,23 @@ export interface Account {
   balance: number;
   createdAt: number;
   secret?: EncryptedSecret;
+  /** 由助记词派生的 ETH 账户地址，解锁/创建时写入，便于界面直接展示 */
+  ethAddress?: string;
+  /** ETH 账户使用的 BIP44 派生路径 */
+  ethPath?: string;
+}
+
+/** 启动时检测结果：数据库里是否已经存在加密助记词 */
+export interface MnemonicState {
+  exists: boolean;
+  /** 第一个（最早创建的）持有助记词的账户地址，供解锁窗口默认选中 */
+  address: string | null;
+}
+
+/** 解锁结果：钱包账户地址 + 派生出的 ETH 账户地址 */
+export interface UnlockResult {
+  address: string;
+  ethAddress: string;
 }
 
 /** 中间内容区展示用的通用数据行 */
@@ -114,13 +132,13 @@ function encryptMnemonic(mnemonic: string, password: string): EncryptedSecret {
 }
 
 /**
- * 创建账户：加密助记词后写入 LevelDB。
- * 仅返回地址，明文助记词与密文都不会回传给渲染进程。
+ * 创建账户：加密助记词后写入 LevelDB，并同步派生 ETH 账户地址。
+ * 仅返回钱包地址与 ETH 地址，明文助记词与密文都不会回传给渲染进程。
  */
 export async function createAccount(
   mnemonic: string,
   password: string,
-): Promise<{ address: string }> {
+): Promise<UnlockResult> {
   if (!db || db.status !== 'open') {
     throw new Error('数据库尚未就绪，无法创建账户');
   }
@@ -137,33 +155,91 @@ export async function createAccount(
   }
 
   const secret = encryptMnemonic(mnemonic, password);
+  // 助记词此刻仍是明文，趁此派生 ETH 账户；派生后不再持有明文引用
+  const eth = deriveEthAccount(mnemonic);
   await db.put(accountKey(address), {
     address,
     balance: 0,
     createdAt: Date.now(),
     secret,
+    ethAddress: eth.address,
+    ethPath: eth.path,
   });
 
-  return { address };
+  return { address, ethAddress: eth.address };
 }
 
-/** 列出所有账户（地址 + 创建时间 + 是否含加密助记词，按创建时间升序） */
+/** 列出所有账户（地址 + 创建时间 + 是否含加密助记词 + ETH 地址，按创建时间升序） */
 export async function listAccounts(): Promise<
-  { address: string; createdAt: number; hasSecret: boolean }[]
+  { address: string; createdAt: number; hasSecret: boolean; ethAddress?: string }[]
 > {
   if (!db || db.status !== 'open') {
     throw new Error('数据库尚未就绪，无法读取账户列表');
   }
-  const accounts: { address: string; createdAt: number; hasSecret: boolean }[] = [];
+  const accounts: {
+    address: string;
+    createdAt: number;
+    hasSecret: boolean;
+    ethAddress?: string;
+  }[] = [];
   for await (const [key, account] of db.iterator()) {
     if (!key.startsWith('account:')) continue;
     accounts.push({
       address: account.address,
       createdAt: account.createdAt,
       hasSecret: Boolean(account.secret),
+      ethAddress: account.ethAddress,
     });
   }
   return accounts.sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/**
+ * 启动检测：数据库里是否已有加密助记词。
+ * 存在时一并返回最早创建的那个账户地址，供解锁窗口默认选中。
+ */
+export async function hasMnemonic(): Promise<MnemonicState> {
+  if (!db || db.status !== 'open') {
+    throw new Error('数据库尚未就绪，无法检查助记词');
+  }
+  let first: { address: string; createdAt: number } | null = null;
+  for await (const [key, account] of db.iterator()) {
+    if (!key.startsWith('account:')) continue;
+    if (!account.secret) continue;
+    if (!first || account.createdAt < first.createdAt) {
+      first = { address: account.address, createdAt: account.createdAt };
+    }
+  }
+  return { exists: Boolean(first), address: first?.address ?? null };
+}
+
+/**
+ * 解锁钱包：用密码解密助记词 → 派生 ETH 账户 → 持久化 ETH 地址。
+ * 明文助记词只在本次调用内存在，不会回传渲染进程；密码错误由 decryptMnemonic 抛出。
+ */
+export async function unlockAccount(address: string, password: string): Promise<UnlockResult> {
+  if (!db || db.status !== 'open') {
+    throw new Error('数据库尚未就绪，无法解锁账户');
+  }
+  if (!address) {
+    throw new Error('请选择要解锁的账户');
+  }
+
+  const mnemonic = await decryptMnemonic(address, password);
+  const account = await db.get(accountKey(address)).catch(() => null);
+  if (!account) {
+    throw new Error('账户不存在');
+  }
+
+  let ethAddress = account.ethAddress;
+  if (!ethAddress) {
+    // 历史账户（创建时尚未派生）在首次解锁时补派生并写回数据库
+    const eth = deriveEthAccount(mnemonic);
+    ethAddress = eth.address;
+    await db.put(accountKey(address), { ...account, ethAddress, ethPath: eth.path });
+  }
+
+  return { address, ethAddress };
 }
 
 /**

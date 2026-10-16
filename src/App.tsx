@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Layout } from 'antd';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -7,10 +8,18 @@ import RightPanel from './components/RightPanel';
 import CreateWalletModal from './components/CreateWalletModal';
 import SettingsModal from './components/SettingsModal';
 import BackupModal from './components/BackupModal';
+import StartupScreen from './components/StartupScreen';
+import UnlockModal from './components/UnlockModal';
+import { startupStore } from './stores/StartupStore';
 
 const { Header: AHeader, Content, Footer: AFooter, Sider } = Layout;
 
 export default function App() {
+  // 启动流程：检测助记词 → 创建 / 解锁
+  useEffect(() => {
+    void startupStore.init();
+  }, []);
+
   return (
     <Layout
       // 关键修复：两个 Sider 嵌在 Content 内部，但 antd 的 Sider 挂载时会向
@@ -114,6 +123,11 @@ export default function App() {
       {/* 设置入口与备份助记词 */}
       <SettingsModal />
       <BackupModal />
+
+      {/* 启动界面：未完成创建/解锁前覆盖在主界面之上 */}
+      <StartupScreen />
+      {/* 已有助记词时的密码解锁窗口 */}
+      <UnlockModal />
     </Layout>
   );
 }

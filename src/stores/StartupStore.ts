@@ -1,0 +1,131 @@
+import { makeAutoObservable, runInAction } from 'mobx';
+import { menuStore } from './MenuStore';
+import { createWalletStore } from './CreateWalletStore';
+import type { AccountBrief } from './SettingsStore';
+import type { UnlockResult } from '../types/global';
+
+/**
+ * 启动流程阶段：
+ * - checking：正在检测本地数据库是否已有助记词
+ * - create  ：无助记词，弹窗引导创建（与「创建」按钮同一套逻辑）
+ * - unlock  ：已有助记词，弹窗输入密码解锁
+ * - ready   ：已完成，进入主界面
+ */
+export type StartupPhase = 'checking' | 'create' | 'unlock' | 'ready';
+
+class StartupStore {
+  phase: StartupPhase = 'checking';
+  /** 持有加密助记词、可被解锁的账户 */
+  accounts: AccountBrief[] = [];
+  selectedAddress: string | null = null;
+  /** 解锁密码，仅存于内存，解锁成功即清空 */
+  password = '';
+  loading = false;
+  error: string | null = null;
+  /** 当前会话已解锁的账户（钱包地址 + ETH 地址） */
+  account: UnlockResult | null = null;
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  get unlocked(): boolean {
+    return this.account !== null;
+  }
+
+  /** 应用启动：检测数据库 → 决定「创建」还是「解锁」 */
+  async init(): Promise<void> {
+    const api = window.walletAPI;
+    if (!api?.hasMnemonic) {
+      // 非 Electron 环境（例如 vite dev 的浏览器预览）：不做启动拦截
+      runInAction(() => {
+        this.phase = 'ready';
+      });
+      return;
+    }
+
+    runInAction(() => {
+      this.loading = true;
+      this.error = null;
+    });
+
+    try {
+      const state = await api.hasMnemonic();
+      if (!state.exists) {
+        // 数据库中没有助记词：复用创建钱包向导，标记为启动流程（不可取消）
+        runInAction(() => {
+          this.phase = 'create';
+        });
+        await createWalletStore.open(true);
+        return;
+      }
+
+      const accounts = (await api.listAccounts()).filter((a) => a.hasSecret);
+      runInAction(() => {
+        this.accounts = accounts;
+        this.selectedAddress = state.address ?? accounts[0]?.address ?? null;
+        this.phase = 'unlock';
+      });
+    } catch (err) {
+      runInAction(() => {
+        this.error = err instanceof Error ? err.message : '启动检测失败';
+        // 检测失败不阻塞进入主界面，用户仍可在界面上手动创建
+        this.phase = 'ready';
+      });
+    } finally {
+      runInAction(() => {
+        this.loading = false;
+      });
+    }
+  }
+
+  setPassword(value: string): void {
+    this.password = value;
+  }
+
+  setSelectedAddress(address: string): void {
+    this.selectedAddress = address;
+  }
+
+  /** 密码解锁：主进程解密助记词并派生 ETH 账户，此处只接收两个地址 */
+  async unlock(): Promise<UnlockResult> {
+    const api = window.walletAPI;
+    if (!api?.unlockWallet) {
+      throw new Error('当前环境不支持解锁（未检测到 Electron 接口）');
+    }
+    if (!this.selectedAddress) throw new Error('请选择要解锁的账户');
+    if (!this.password) throw new Error('请输入密码');
+
+    this.loading = true;
+    this.error = null;
+    try {
+      const result = await api.unlockWallet(this.selectedAddress, this.password);
+      runInAction(() => {
+        this.account = result;
+        this.password = ''; // 解锁成功后立即丢弃内存中的密码
+        this.phase = 'ready';
+        this.loading = false;
+      });
+      void menuStore.loadData();
+      return result;
+    } catch (err) {
+      runInAction(() => {
+        this.error = err instanceof Error ? err.message : '解锁失败';
+        this.loading = false;
+      });
+      throw err;
+    }
+  }
+
+  /** 启动阶段完成创建：记录账户并放行进入主界面 */
+  markCreated(result: UnlockResult): void {
+    runInAction(() => {
+      this.account = result;
+      this.phase = 'ready';
+      this.error = null;
+    });
+    void menuStore.loadData();
+  }
+}
+
+export const startupStore = new StartupStore();

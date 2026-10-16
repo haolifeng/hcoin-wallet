@@ -6,5 +6,7 @@ electron.contextBridge.exposeInMainWorld("walletAPI", {
   generateMnemonic: () => electron.ipcRenderer.invoke("wallet:generateMnemonic"),
   createAccount: (mnemonic, password) => electron.ipcRenderer.invoke("wallet:createAccount", mnemonic, password),
   listAccounts: () => electron.ipcRenderer.invoke("wallet:listAccounts"),
-  backupMnemonic: (address, password) => electron.ipcRenderer.invoke("wallet:backupMnemonic", address, password)
+  backupMnemonic: (address, password) => electron.ipcRenderer.invoke("wallet:backupMnemonic", address, password),
+  hasMnemonic: () => electron.ipcRenderer.invoke("wallet:hasMnemonic"),
+  unlockWallet: (address, password) => electron.ipcRenderer.invoke("wallet:unlockWallet", address, password)
 });

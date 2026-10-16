@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { menuStore } from './MenuStore';
+import type { UnlockResult } from '../types/global';
 
 const WORD_COUNT = 12;
 /** 校验环节需要回填的单词数量 */
@@ -37,6 +38,8 @@ export function validatePassword(password: string): string[] {
 
 class CreateWalletStore {
   visible = false;
+  /** 启动流程中调用时为 true：弹窗不可取消，创建完成即进入主界面 */
+  startup = false;
   step: CreateStep = 1;
   /** 助记词只保存在内存中，弹窗关闭即清空 */
   mnemonic: string[] = [];
@@ -56,14 +59,16 @@ class CreateWalletStore {
   }
 
   /** 打开向导：先生成 12 个助记词（主进程 BIP39 生成） */
-  async open(): Promise<void> {
+  async open(startup = false): Promise<void> {
     this.reset();
+    this.startup = startup;
     this.visible = true;
     await this.generateMnemonic();
   }
 
   close(): void {
     this.visible = false;
+    this.startup = false;
     this.reset();
   }
 
@@ -154,8 +159,8 @@ class CreateWalletStore {
     return this.passwordValid && this.passwordMatched;
   }
 
-  /** 提交创建：加密并写入 LevelDB，成功后刷新账户列表 */
-  async submit(): Promise<string> {
+  /** 提交创建：加密并写入 LevelDB，同时派生 ETH 账户，成功后刷新账户列表 */
+  async submit(): Promise<UnlockResult> {
     if (!this.canSubmit) throw new Error('密码不符合要求');
 
     this.loading = true;
@@ -165,7 +170,8 @@ class CreateWalletStore {
       if (!api?.createAccount) {
         throw new Error('当前环境不支持创建账户（未检测到 Electron 接口）');
       }
-      const { address } = await api.createAccount(this.mnemonicPhrase, this.password);
+      // 主进程加密助记词后落盘，并派生 ETH 账户地址一并返回
+      const result = await api.createAccount(this.mnemonicPhrase, this.password);
       // 刷新数据；切到「账户」分区，方便直接看到新建的账户
       if (menuStore.selectedKey !== 'accounts') {
         menuStore.select('accounts');
@@ -175,7 +181,7 @@ class CreateWalletStore {
       runInAction(() => {
         this.loading = false;
       });
-      return address;
+      return result;
     } catch (err) {
       runInAction(() => {
         this.error = err instanceof Error ? err.message : '创建账户失败';
