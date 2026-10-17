@@ -1,6 +1,7 @@
 import { Button, Modal, Typography } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { startupStore } from '../stores/StartupStore';
+import { useT } from '../i18n/I18nProvider';
 
 const { Paragraph } = Typography;
 
@@ -9,10 +10,12 @@ const { Paragraph } = Typography;
  * 「创建新的助记词」或「导入已有助记词」。
  */
 const StartupChoiceModal = observer(() => {
+  const t = useT();
+
   return (
     <Modal
       open={startupStore.phase === 'choose'}
-      title="欢迎使用 HCoinWallet"
+      title={t('startup.welcome')}
       width={420}
       maskClosable={false}
       closable={false}
@@ -20,7 +23,7 @@ const StartupChoiceModal = observer(() => {
       footer={null}
     >
       <Paragraph type="secondary" style={{ marginBottom: 20 }}>
-        本机尚未检测到助记词，请选择一种方式开始：
+        {t('startup.noMnemonic')}
       </Paragraph>
       <Button
         block
@@ -29,10 +32,10 @@ const StartupChoiceModal = observer(() => {
         style={{ marginBottom: 12 }}
         onClick={() => void startupStore.chooseCreate()}
       >
-        创建新的助记词
+        {t('startup.createNew')}
       </Button>
       <Button block size="large" onClick={() => void startupStore.chooseImport()}>
-        导入已有助记词
+        {t('startup.importExisting')}
       </Button>
     </Modal>
   );

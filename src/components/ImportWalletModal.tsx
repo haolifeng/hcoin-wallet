@@ -2,6 +2,7 @@ import { Alert, Button, Input, Modal, Tag, Typography, message } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { importWalletStore } from '../stores/ImportWalletStore';
 import { startupStore } from '../stores/StartupStore';
+import { useT } from '../i18n/I18nProvider';
 
 const { Text, Paragraph } = Typography;
 
@@ -10,16 +11,17 @@ const WORD_COUNT = 12;
 /** 导入助记词：输入已有 12 词 → 设置密码 → 加密存入数据库并派生 ETH 账户 */
 const ImportWalletModal = observer(() => {
   const store = importWalletStore;
+  const t = useT();
 
   const handleSubmit = async () => {
     try {
       const result = await store.submit();
-      message.success(`导入成功，ETH 账户：${result.ethAddress}`);
+      message.success(t('import.success', { address: result.ethAddress }));
       // 记录当前账户（启动流程中还会由此放行进入主界面）
       startupStore.markCreated(result);
       store.close();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '导入失败');
+      message.error(err instanceof Error ? err.message : t('err.importFailed'));
     }
   };
 
@@ -31,21 +33,21 @@ const ImportWalletModal = observer(() => {
         <Alert
           type="info"
           showIcon
-          message="请输入您的助记词"
-          description="按原有顺序输入 12 个英文助记词，用空格分隔，也可直接整段粘贴。助记词仅在本机加密保存。"
+          message={t('import.enterPhraseTitle')}
+          description={t('import.enterPhraseDesc')}
           style={{ marginBottom: 16 }}
         />
-        <Text strong>助记词</Text>
+        <Text strong>{t('import.mnemonic')}</Text>
         <Input.TextArea
           value={store.phrase}
           rows={4}
-          placeholder="例如：apple banana cat ...（共 12 个单词）"
+          placeholder={t('import.phrasePlaceholder')}
           onChange={(e) => store.setPhrase(e.target.value)}
           style={{ marginTop: 4 }}
         />
         <div style={{ marginTop: 8 }}>
           <Text type={store.countOk ? 'success' : 'secondary'}>
-            已输入 {words.length} / {WORD_COUNT} 个
+            {t('import.wordCount', { current: words.length, total: WORD_COUNT })}
           </Text>
         </div>
         {words.length > 0 && (
@@ -63,7 +65,7 @@ const ImportWalletModal = observer(() => {
         )}
         {!store.countOk && words.length > 0 && (
           <Paragraph type="danger" style={{ marginTop: 8, marginBottom: 0 }}>
-            助记词数量应为 {WORD_COUNT} 个，请检查后重试。
+            {t('import.countError', { total: WORD_COUNT })}
           </Paragraph>
         )}
       </>
@@ -79,15 +81,15 @@ const ImportWalletModal = observer(() => {
         <Alert
           type="info"
           showIcon
-          message="请设置账户密码"
-          description="密码用于加密保存导入的助记词，至少 8 位，需包含数字、字母与特殊字符，且至少包含 1 个大写字母和 1 个特殊字符。"
+          message={t('create.setPasswordTitle')}
+          description={t('import.setPasswordDesc')}
           style={{ marginBottom: 16 }}
         />
         <div style={{ marginBottom: 12 }}>
-          <Text strong>密码</Text>
+          <Text strong>{t('common.password')}</Text>
           <Input.Password
             value={store.password}
-            placeholder="请输入密码"
+            placeholder={t('common.passwordPlaceholder')}
             status={store.password.length > 0 && !store.passwordValid ? 'error' : undefined}
             onChange={(e) => store.setPassword(e.target.value)}
             style={{ marginTop: 4 }}
@@ -103,20 +105,20 @@ const ImportWalletModal = observer(() => {
           )}
           {store.passwordValid && (
             <Text type="success" style={{ marginTop: 4, display: 'inline-block' }}>
-              密码符合要求
+              {t('password.valid')}
             </Text>
           )}
         </div>
         <div>
-          <Text strong>确认密码</Text>
+          <Text strong>{t('common.confirmPassword')}</Text>
           <Input.Password
             value={store.confirmPassword}
-            placeholder="请再次输入密码"
+            placeholder={t('common.confirmPasswordPlaceholder')}
             status={showConfirmError ? 'error' : undefined}
             onChange={(e) => store.setConfirmPassword(e.target.value)}
             style={{ marginTop: 4 }}
           />
-          {showConfirmError && <Text type="danger">两次输入的密码不一致</Text>}
+          {showConfirmError && <Text type="danger">{t('password.mismatch')}</Text>}
         </div>
       </>
     );
@@ -130,7 +132,7 @@ const ImportWalletModal = observer(() => {
             ? []
             : [
                 <Button key="cancel" onClick={() => store.close()}>
-                  取消
+                  {t('common.cancel')}
                 </Button>,
               ]),
           <Button
@@ -140,12 +142,12 @@ const ImportWalletModal = observer(() => {
             disabled={!store.countOk || store.checking}
             onClick={() => void store.goSetPassword()}
           >
-            下一步
+            {t('common.next')}
           </Button>,
         ]
       : [
           <Button key="back" onClick={() => store.backToPhrase()} disabled={store.loading}>
-            上一步
+            {t('common.back')}
           </Button>,
           <Button
             key="submit"
@@ -154,14 +156,14 @@ const ImportWalletModal = observer(() => {
             disabled={!store.canSubmit || store.loading}
             onClick={handleSubmit}
           >
-            确认导入
+            {t('import.confirm')}
           </Button>,
         ];
 
   return (
     <Modal
       open={store.visible}
-      title={store.step === 1 ? '导入助记词 · 输入助记词' : '导入助记词 · 设置密码'}
+      title={store.step === 1 ? t('import.titlePhrase') : t('import.titlePassword')}
       width={560}
       maskClosable={false}
       closable={!store.startup}

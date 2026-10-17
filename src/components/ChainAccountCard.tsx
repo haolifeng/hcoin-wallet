@@ -5,6 +5,7 @@ import { startupStore } from '../stores/StartupStore';
 import { networkStore } from '../stores/NetworkStore';
 import { resolveChainAddress, type ChainDisplay } from '../constants/chains';
 import type { NetworkType } from '../constants/network';
+import { useT } from '../i18n/I18nProvider';
 
 const { Text } = Typography;
 
@@ -30,6 +31,7 @@ const BTC_DERIVATION_PATH: Record<NetworkType, string> = {
  */
 const ChainAccountCard = observer(({ chain }: { chain: ChainDisplay }) => {
   const account = startupStore.account;
+  const t = useT();
 
   useEffect(() => {
     if (!account) return;
@@ -42,8 +44,12 @@ const ChainAccountCard = observer(({ chain }: { chain: ChainDisplay }) => {
 
   if (!account) {
     return (
-      <Card size="small" title={`${chain.nativeSymbol} 账户`} style={{ marginBottom: 16 }}>
-        <Text type="secondary">钱包未解锁，请先解锁后查看 {chain.nativeSymbol} 账户信息。</Text>
+      <Card
+        size="small"
+        title={t('content.accountTitle', { symbol: chain.nativeSymbol })}
+        style={{ marginBottom: 16 }}
+      >
+        <Text type="secondary">{t('content.lockedHint', { symbol: chain.nativeSymbol })}</Text>
       </Card>
     );
   }
@@ -56,12 +62,12 @@ const ChainAccountCard = observer(({ chain }: { chain: ChainDisplay }) => {
   return (
     <Card
       size="small"
-      title={`${chain.nativeSymbol} 账户`}
+      title={t('content.accountTitle', { symbol: chain.nativeSymbol })}
       extra={<Tag color="blue">{chain.name}</Tag>}
       style={{ marginBottom: 16 }}
     >
       <div style={{ marginBottom: 8 }}>
-        <Text type="secondary">{chain.nativeSymbol} 地址</Text>
+        <Text type="secondary">{t('content.addressLabel', { symbol: chain.nativeSymbol })}</Text>
         <div>
           <Text code copyable style={{ wordBreak: 'break-all' }}>
             {address}
@@ -69,7 +75,7 @@ const ChainAccountCard = observer(({ chain }: { chain: ChainDisplay }) => {
         </div>
       </div>
       <div style={{ marginBottom: 8 }}>
-        <Text type="secondary">网络</Text>
+        <Text type="secondary">{t('content.network')}</Text>
         <div>
           <Text>
             {chain.name}（{networkStore.label}）
@@ -77,13 +83,13 @@ const ChainAccountCard = observer(({ chain }: { chain: ChainDisplay }) => {
         </div>
       </div>
       <div style={{ marginBottom: 8 }}>
-        <Text type="secondary">派生路径</Text>
+        <Text type="secondary">{t('content.derivationPath')}</Text>
         <div>
           <Text code>{derivationPath}</Text>
         </div>
       </div>
       <div>
-        <Text type="secondary">钱包账户</Text>
+        <Text type="secondary">{t('content.walletAccount')}</Text>
         <div>
           <Text code copyable={{ text: account.address }} title={account.address}>
             {account.address}

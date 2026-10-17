@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { createWalletStore } from './CreateWalletStore';
 import { importWalletStore } from './ImportWalletStore';
+import { localeStore } from './LocaleStore';
 import type { AccountBrief } from './SettingsStore';
 import type { UnlockResult, ChainBalances } from '../types/global';
 
@@ -79,7 +80,7 @@ class StartupStore {
       });
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '启动检测失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.startupCheckFailed');
         // 检测失败不阻塞进入主界面，用户仍可在界面上手动创建
         this.phase = 'ready';
       });
@@ -118,10 +119,10 @@ class StartupStore {
   async unlock(): Promise<UnlockResult> {
     const api = window.walletAPI;
     if (!api?.unlockWallet) {
-      throw new Error('当前环境不支持解锁（未检测到 Electron 接口）');
+      throw new Error(localeStore.t('err.envUnlock'));
     }
-    if (!this.selectedAddress) throw new Error('请选择要解锁的账户');
-    if (!this.password) throw new Error('请输入密码');
+    if (!this.selectedAddress) throw new Error(localeStore.t('err.selectUnlockAccount'));
+    if (!this.password) throw new Error(localeStore.t('err.enterPassword'));
 
     this.loading = true;
     this.error = null;
@@ -136,7 +137,7 @@ class StartupStore {
       return result;
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '解锁失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.unlockFailed');
         this.loading = false;
       });
       throw err;

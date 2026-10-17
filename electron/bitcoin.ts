@@ -2,6 +2,7 @@ import { HDKey } from '@scure/bip32';
 import * as btc from '@scure/btc-signer';
 import { mnemonicToSeedSync } from 'bip39';
 import { getNetwork, type NetworkType } from './network';
+import { t } from './locale';
 
 /** BIP84 Native SegWit 主网派生路径 */
 export const BTC_MAINNET_DERIVE_PATH = "m/84'/0'/0'/0/0";
@@ -81,11 +82,11 @@ export function deriveBtcAccount(
   const seed = mnemonicToSeedSync(mnemonic.trim().toLowerCase());
   const child = HDKey.fromMasterSeed(seed).derive(config.path);
   if (!child.publicKey || !child.privateKey) {
-    throw new Error('BTC 账户派生失败');
+    throw new Error(t('err.btcDeriveFailed'));
   }
   const payment = btc.p2wpkh(child.publicKey, config.network);
   if (!payment.address) {
-    throw new Error('BTC 地址生成失败');
+    throw new Error(t('err.btcAddressFailed'));
   }
   return {
     address: payment.address,
@@ -110,7 +111,7 @@ export function isValidBtcAddress(address: string, network: NetworkType = getNet
 export function btcToSats(amount: string): bigint {
   const trimmed = amount.trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    throw new Error('发送数量格式不正确');
+    throw new Error(t('err.amountFormat'));
   }
   const [intPart, fracPart = ''] = trimmed.split('.');
   const frac = `${fracPart}00000000`.slice(0, 8);
@@ -125,7 +126,7 @@ function satsToBtc(sats: bigint): number {
 async function apiGet<T>(apiBase: string, path: string): Promise<T> {
   const res = await fetch(`${apiBase}${path}`);
   if (!res.ok) {
-    throw new Error(`BTC API 请求失败：${res.status} ${res.statusText}`);
+    throw new Error(t('err.btcApiFailed', { status: res.status, statusText: res.statusText }));
   }
   return (await res.json()) as T;
 }
@@ -183,18 +184,18 @@ export async function sendBtc(
   const config = getBtcNetworkConfig(network);
   const toAddress = to.trim();
   if (!isValidBtcAddress(toAddress, network)) {
-    throw new Error('无效的 BTC 收款地址');
+    throw new Error(t('err.btcAddressInvalid'));
   }
   const sendSats = btcToSats(amount);
   if (sendSats <= 0n) {
-    throw new Error('请输入有效的发送数量');
+    throw new Error(t('err.amountPositive'));
   }
 
   const payment = btc.p2wpkh(account.publicKey, config.network);
   const feeRate = await fetchFeeRate(config.apiBase);
   const rawUtxos = await apiGet<ApiUtxo[]>(config.apiBase, `/address/${account.address}/utxo`);
   if (rawUtxos.length === 0) {
-    throw new Error('可用余额为 0，无法发送');
+    throw new Error(t('err.noUtxo'));
   }
 
   // 优先使用大额 UTXO，减少输入数量
@@ -216,7 +217,7 @@ export async function sendBtc(
 
   const fee = BigInt(Math.ceil(estimateVsize(selected.length, 2) * feeRate));
   if (total < sendSats + fee) {
-    throw new Error('余额不足以支付发送数量与手续费');
+    throw new Error(t('err.insufficient'));
   }
 
   const change = total - sendSats - fee;
@@ -243,7 +244,7 @@ export async function sendBtc(
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`广播失败：${res.status} ${detail}`.trim());
+    throw new Error(t('err.broadcastFailed', { status: res.status, detail }).trim());
   }
   const txid = (await res.text()).trim();
   return txid || tx.id;

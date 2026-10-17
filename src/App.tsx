@@ -16,6 +16,7 @@ import SendModal from './components/SendModal';
 import { startupStore } from './stores/StartupStore';
 import { priceStore } from './stores/PriceStore';
 import { networkStore } from './stores/NetworkStore';
+import { localeStore } from './stores/LocaleStore';
 
 const { Header: AHeader, Content, Footer: AFooter, Sider } = Layout;
 
@@ -26,6 +27,11 @@ export default function App() {
   // 启动流程：检测助记词 → 创建 / 解锁
   useEffect(() => {
     void startupStore.init();
+  }, []);
+
+  // 同步主进程持久化的语言（中文 / English）
+  useEffect(() => {
+    void localeStore.init();
   }, []);
 
   // 同步主进程持久化的网络环境（主网 / 测试网）

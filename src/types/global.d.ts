@@ -1,3 +1,6 @@
+/** 界面语言 */
+export type Locale = 'zh' | 'en';
+
 /** 网络环境：主网 / 测试网 */
 export type NetworkType = 'mainnet' | 'testnet';
 
@@ -54,6 +57,8 @@ export interface SendParams {
 declare global {
   interface Window {
     walletAPI?: {
+      getLocale: () => Promise<Locale>;
+      setLocale: (locale: Locale) => Promise<Locale>;
       getNetwork: () => Promise<NetworkType>;
       setNetwork: (network: NetworkType) => Promise<SetNetworkResult>;
       getBalance: (address: string) => Promise<number>;

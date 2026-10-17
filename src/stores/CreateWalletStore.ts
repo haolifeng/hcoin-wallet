@@ -1,4 +1,5 @@
 import { makeAutoObservable, runInAction } from 'mobx';
+import { localeStore } from './LocaleStore';
 import type { UnlockResult } from '../types/global';
 
 const WORD_COUNT = 12;
@@ -27,11 +28,11 @@ function pickIndexes(count: number): number[] {
  */
 export function validatePassword(password: string): string[] {
   const errors: string[] = [];
-  if (password.length < 8) errors.push('至少 8 位');
-  if (!/[0-9]/.test(password)) errors.push('至少包含一个数字');
-  if (!/[a-zA-Z]/.test(password)) errors.push('至少包含一个字母');
-  if (!/[A-Z]/.test(password)) errors.push('至少包含一个大写字母');
-  if (!/[^A-Za-z0-9]/.test(password)) errors.push('至少包含一个特殊字符');
+  if (password.length < 8) errors.push(localeStore.t('password.minLength'));
+  if (!/[0-9]/.test(password)) errors.push(localeStore.t('password.needDigit'));
+  if (!/[a-zA-Z]/.test(password)) errors.push(localeStore.t('password.needLetter'));
+  if (!/[A-Z]/.test(password)) errors.push(localeStore.t('password.needUpper'));
+  if (!/[^A-Za-z0-9]/.test(password)) errors.push(localeStore.t('password.needSpecial'));
   return errors;
 }
 
@@ -77,7 +78,7 @@ class CreateWalletStore {
     try {
       const api = window.walletAPI;
       if (!api?.generateMnemonic) {
-        throw new Error('当前环境不支持创建账户（未检测到 Electron 接口）');
+        throw new Error(localeStore.t('err.envCreate'));
       }
       const phrase = await api.generateMnemonic();
       runInAction(() => {
@@ -85,7 +86,7 @@ class CreateWalletStore {
       });
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '助记词生成失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.mnemonicGenerateFailed');
       });
     } finally {
       runInAction(() => {
@@ -160,14 +161,14 @@ class CreateWalletStore {
 
   /** 提交创建：加密并写入 LevelDB，同时派生 ETH 账户，成功后刷新账户列表 */
   async submit(): Promise<UnlockResult> {
-    if (!this.canSubmit) throw new Error('密码不符合要求');
+    if (!this.canSubmit) throw new Error(localeStore.t('err.passwordInvalid'));
 
     this.loading = true;
     this.error = null;
     try {
       const api = window.walletAPI;
       if (!api?.createAccount) {
-        throw new Error('当前环境不支持创建账户（未检测到 Electron 接口）');
+        throw new Error(localeStore.t('err.envCreate'));
       }
       // 主进程加密助记词后落盘，并派生 ETH 账户地址一并返回
       const result = await api.createAccount(this.mnemonicPhrase, this.password);
@@ -177,7 +178,7 @@ class CreateWalletStore {
       return result;
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '创建账户失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.createFailed');
         this.loading = false;
       });
       throw err;

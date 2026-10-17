@@ -1,4 +1,5 @@
 import { makeAutoObservable, runInAction } from 'mobx';
+import { localeStore } from './LocaleStore';
 
 export interface AccountBrief {
   address: string;
@@ -48,7 +49,7 @@ class SettingsStore {
     try {
       const api = window.walletAPI;
       if (!api?.listAccounts) {
-        throw new Error('当前环境不支持备份（未检测到 Electron 接口）');
+        throw new Error(localeStore.t('err.envBackup'));
       }
       const accounts = await api.listAccounts();
       runInAction(() => {
@@ -59,7 +60,7 @@ class SettingsStore {
       });
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '读取账户列表失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.loadAccountsFailed');
       });
     } finally {
       runInAction(() => {
@@ -78,15 +79,15 @@ class SettingsStore {
 
   /** 用密码解密所选账户的助记词 */
   async submitBackup(): Promise<void> {
-    if (!this.selectedAddress) throw new Error('请选择要备份的账户');
-    if (!this.password) throw new Error('请输入密码');
+    if (!this.selectedAddress) throw new Error(localeStore.t('err.selectBackupAccount'));
+    if (!this.password) throw new Error(localeStore.t('err.enterPassword'));
 
     this.loading = true;
     this.error = null;
     try {
       const api = window.walletAPI;
       if (!api?.backupMnemonic) {
-        throw new Error('当前环境不支持备份（未检测到 Electron 接口）');
+        throw new Error(localeStore.t('err.envBackup'));
       }
       const phrase = await api.backupMnemonic(this.selectedAddress, this.password);
       runInAction(() => {
@@ -96,7 +97,7 @@ class SettingsStore {
       });
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '备份失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.backupFailed');
         this.loading = false;
       });
       throw err;

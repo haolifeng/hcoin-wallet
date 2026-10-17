@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('walletAPI', {
+  getLocale: () => ipcRenderer.invoke('wallet:getLocale'),
+  setLocale: (locale: 'zh' | 'en') => ipcRenderer.invoke('wallet:setLocale', locale),
   getNetwork: () => ipcRenderer.invoke('wallet:getNetwork'),
   setNetwork: (network: 'mainnet' | 'testnet') =>
     ipcRenderer.invoke('wallet:setNetwork', network),

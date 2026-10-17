@@ -26,6 +26,7 @@ import {
 import { deriveBtcAccount, sendBtc } from './bitcoin';
 import { deriveSolAccount, sendSol, resetSolConnections } from './solana';
 import { loadNetwork, setNetwork, getNetwork, type NetworkType } from './network';
+import { loadLocale, setLocale, getLocale, t, type Locale } from './locale';
 import {
   setActiveWallet,
   getActiveWallet,
@@ -81,6 +82,9 @@ app.whenReady().then(async () => {
     console.error('[main] 数据库初始化失败，应用将以只读/无数据方式继续运行:', err);
   }
 
+  // 恢复上次选择的语言（影响主进程抛出的错误提示文案）
+  await loadLocale();
+
   // 恢复上次选择的网络环境（主网 / 测试网），必须在任何链操作之前完成
   const network = await loadNetwork();
   console.log(`[main] 当前网络环境：${network === 'mainnet' ? '主网' : '测试网'}`);
@@ -89,6 +93,16 @@ app.whenReady().then(async () => {
 
   // 后台轮询当前网络环境下各链余额并写入数据库，供渲染进程查询
   startEthBalancePolling();
+
+  // IPC：读取当前语言
+  ipcMain.handle('wallet:getLocale', () => {
+    return getLocale();
+  });
+
+  // IPC：切换语言（主进程错误提示同样需要本地化）
+  ipcMain.handle('wallet:setLocale', async (_event, next: Locale) => {
+    return setLocale(next);
+  });
 
   // IPC：读取当前网络环境
   ipcMain.handle('wallet:getNetwork', () => {
@@ -188,26 +202,26 @@ app.whenReady().then(async () => {
   ipcMain.handle('wallet:send', async (_event, params: SendParams) => {
     const { address, chain: chainKey, asset, to, amount } = params ?? ({} as SendParams);
     const active = getActiveWallet();
-    if (!active) throw new Error('钱包未解锁，无法发送');
-    if (active.address !== address) throw new Error('当前解锁账户与发送账户不一致');
-    if (!to?.trim()) throw new Error('请输入接收地址');
+    if (!active) throw new Error(t('err.walletLocked'));
+    if (active.address !== address) throw new Error(t('err.accountMismatch'));
+    if (!to?.trim()) throw new Error(t('err.enterRecipient'));
 
     const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) throw new Error('请输入有效的发送数量');
+    if (!Number.isFinite(value) || value <= 0) throw new Error(t('err.amountPositive'));
 
     const chain = getChain(chainKey);
     let txHash: string;
     if (chain.kind === 'bitcoin') {
       if (asset !== chain.nativeSymbol) {
-        throw new Error(`链 ${chain.name} 不支持资产：${asset}`);
+        throw new Error(t('err.assetNotSupported', { name: chain.name, asset }));
       }
       // 取当前网络环境下派生的 BTC 账户（主网 / 测试网私钥不同）
       const btc = getActiveBtcAccount();
-      if (!btc) throw new Error('钱包未解锁，无法发送');
+      if (!btc) throw new Error(t('err.walletLocked'));
       txHash = await sendBtc(btc, to.trim(), String(amount).trim());
     } else if (chain.kind === 'solana') {
       if (asset !== chain.nativeSymbol) {
-        throw new Error(`链 ${chain.name} 不支持资产：${asset}`);
+        throw new Error(t('err.assetNotSupported', { name: chain.name, asset }));
       }
       txHash = await sendSol(active.sol.secretKey, to.trim(), String(amount).trim());
     } else {

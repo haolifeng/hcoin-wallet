@@ -1,11 +1,12 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import {
   DEFAULT_NETWORK,
-  NETWORK_LABEL,
+  NETWORK_LABEL_KEY,
   NETWORK_STORAGE_KEY,
   isNetworkType,
   type NetworkType,
 } from '../constants/network';
+import { localeStore } from './LocaleStore';
 import { startupStore } from './StartupStore';
 
 /**
@@ -28,9 +29,9 @@ class NetworkStore {
     return this.network === 'mainnet';
   }
 
-  /** 当前网络环境的展示名 */
+  /** 当前网络环境的展示名（随语言切换） */
   get label(): string {
-    return NETWORK_LABEL[this.network];
+    return localeStore.t(NETWORK_LABEL_KEY[this.network]);
   }
 
   /** 应用启动：以主进程持久化的网络为准，非 Electron 环境回落到本地缓存 */
@@ -95,7 +96,7 @@ class NetworkStore {
       runInAction(() => {
         this.network = previous;
         this.switching = false;
-        this.error = err instanceof Error ? err.message : '切换网络失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('network.switchFailed');
       });
       throw err;
     }

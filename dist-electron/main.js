@@ -21897,6 +21897,463 @@ async function setNetwork(network) {
   }
   return currentNetwork;
 }
+const DEFAULT_LOCALE = "zh";
+const zh = {
+  // —— 通用 ——
+  "common.cancel": "取消",
+  "common.close": "关闭",
+  "common.back": "上一步",
+  "common.next": "下一步",
+  "common.continue": "继续",
+  "common.settings": "设置",
+  "common.send": "发送",
+  "common.password": "密码",
+  "common.confirmPassword": "确认密码",
+  "common.passwordPlaceholder": "请输入密码",
+  "common.confirmPasswordPlaceholder": "请再次输入密码",
+  "common.selectAccount": "选择账户",
+  "common.account": "账户",
+  "common.asset": "资产",
+  "common.balance": "余额",
+  "common.priceUsd": "价格（USD）",
+  "common.valueUsd": "估值（USD）",
+  "common.action": "操作",
+  "common.noData": "暂无资产",
+  // —— 顶栏 ——
+  "header.notLoggedIn": "未登录",
+  // —— 左侧菜单 ——
+  "menu.overview": "总览",
+  // —— 网络环境 ——
+  "network.env": "网络环境",
+  "network.mainnet": "主网",
+  "network.testnet": "测试网",
+  "network.mainnetDesc": "Ethereum / Avalanche / Bitcoin / Solana",
+  "network.testnetDesc": "Sepolia / Fuji / Bitcoin Testnet / Devnet",
+  "network.currentMainnet": "当前为主网",
+  "network.mainnetWarning": "所有转账使用真实资金，且不可撤销。",
+  "network.switchTitle": "切换到主网？",
+  "network.switchContent": "主网使用真实资金，交易一旦广播不可撤销。请确认已核对地址与网络。",
+  "network.confirmSwitch": "确认切换",
+  "network.switched": "已切换到{label}",
+  "network.switchFailed": "切换网络失败",
+  // —— 语言 ——
+  "locale.language": "语言",
+  "locale.zh": "中文",
+  "locale.en": "English",
+  "locale.switched": "已切换为{label}",
+  // —— 设置 ——
+  "settings.title": "设置",
+  "settings.backup": "备份",
+  "settings.about": "关于",
+  "settings.notImplemented": "{name} 功能暂未实现",
+  // —— 备份 ——
+  "backup.title": "备份助记词",
+  "backup.confirm": "确认备份",
+  "backup.enterPasswordTitle": "请输入该账户的密码",
+  "backup.enterPasswordDesc": "密码用于解密数据库中保存的助记词密文，验证通过后会显示明文助记词。",
+  "backup.noBackable": "暂无可备份的账户，请先创建账户。",
+  "backup.noSecret": "（无备份数据）",
+  "backup.saveTitle": "请您保存好助记词",
+  "backup.saveDesc": "以下是解密后的明文助记词，请勿截图或通过网络发送；关闭弹窗后不会保留。",
+  // —— 解锁 ——
+  "unlock.title": "解锁钱包",
+  "unlock.action": "解锁",
+  "unlock.enterPasswordTitle": "请输入该账户的密码",
+  "unlock.enterPasswordDesc": "密码用于解密本机保存的助记词，验证通过后会派生 ETH 账户并展示在界面上。",
+  "unlock.success": "解锁成功，ETH 账户：{address}",
+  // —— 启动流程 ——
+  "startup.welcome": "欢迎使用 HCoinWallet",
+  "startup.noMnemonic": "本机尚未检测到助记词，请选择一种方式开始：",
+  "startup.createNew": "创建新的助记词",
+  "startup.importExisting": "导入已有助记词",
+  "startup.slogan": "安全 · 自托管 · 助记词只保存在本机",
+  "startup.status.checking": "正在检查本地钱包数据…",
+  "startup.status.choose": "未检测到助记词，请选择创建或导入",
+  "startup.status.create": "正在创建新的助记词钱包…",
+  "startup.status.import": "正在导入已有助记词…",
+  "startup.status.unlock": "已检测到助记词，请输入密码解锁",
+  "startup.status.ready": "",
+  // —— 创建钱包 ——
+  "create.title": "创建钱包 · {step}",
+  "create.stepMnemonic": "生成助记词",
+  "create.stepVerify": "校验助记词",
+  "create.stepPassword": "设置密码",
+  "create.welcomeDesc": "本机尚未创建助记词，请先完成下方步骤创建钱包。助记词将加密保存在本机数据库中。",
+  "create.saveTitle": "请您保存好助记词",
+  "create.saveDesc": "助记词是恢复该账户的唯一凭证。请按顺序抄写并离线保管，切勿截图或通过网络发送；一旦丢失将无法找回。",
+  "create.emptyMnemonic": "暂无助记词，请稍候或重新打开弹窗。",
+  "create.verifyTitle": "请回填对应序号的助记词",
+  "create.verifyDesc": "为确保您已备份助记词，请按顺序输入下列序号对应的单词。",
+  "create.wordIndex": "第 {index} 个助记词",
+  "create.wordPlaceholder": "请输入对应单词",
+  "create.wordWrong": "单词不正确，请核对后重试",
+  "create.setPasswordTitle": "请设置账户密码",
+  "create.setPasswordDesc": "密码用于加密保存助记词，至少 8 位，需包含数字、字母与特殊字符，且至少包含 1 个大写字母和 1 个特殊字符。",
+  "create.confirm": "确认创建",
+  "create.success": "账户创建成功，ETH 账户：{address}",
+  // —— 导入钱包 ——
+  "import.titlePhrase": "导入助记词 · 输入助记词",
+  "import.titlePassword": "导入助记词 · 设置密码",
+  "import.enterPhraseTitle": "请输入您的助记词",
+  "import.enterPhraseDesc": "按原有顺序输入 12 个英文助记词，用空格分隔，也可直接整段粘贴。助记词仅在本机加密保存。",
+  "import.mnemonic": "助记词",
+  "import.phrasePlaceholder": "例如：apple banana cat ...（共 12 个单词）",
+  "import.wordCount": "已输入 {current} / {total} 个",
+  "import.countError": "助记词数量应为 {total} 个，请检查后重试。",
+  "import.setPasswordDesc": "密码用于加密保存导入的助记词，至少 8 位，需包含数字、字母与特殊字符，且至少包含 1 个大写字母和 1 个特殊字符。",
+  "import.confirm": "确认导入",
+  "import.success": "导入成功，ETH 账户：{address}",
+  // —— 密码规则 ——
+  "password.minLength": "至少 8 位",
+  "password.needDigit": "至少包含一个数字",
+  "password.needLetter": "至少包含一个字母",
+  "password.needUpper": "至少包含一个大写字母",
+  "password.needSpecial": "至少包含一个特殊字符",
+  "password.valid": "密码符合要求",
+  "password.mismatch": "两次输入的密码不一致",
+  // —— 总览 ——
+  "overview.chain": "链",
+  "overview.totalTitle": "资产总额（USD）",
+  "overview.priceSource": "价格来源：CoinGecko · 更新于 {time}",
+  "overview.priceFallback": "价格来源：CoinGecko · 暂用兜底价格",
+  // —— 单链内容区 ——
+  "content.accountTitle": "{symbol} 账户",
+  "content.lockedHint": "钱包未解锁，请先解锁后查看 {symbol} 账户信息。",
+  "content.addressLabel": "{symbol} 地址",
+  "content.network": "网络",
+  "content.derivationPath": "派生路径",
+  "content.walletAccount": "钱包账户",
+  "content.subtotal": "小计（USD）",
+  // —— 发送 ——
+  "send.title": "发送",
+  "send.confirm": "确认发送",
+  "send.submitted": "交易已提交",
+  "send.broadcast": "交易已广播到 {chain} {network}，等待打包确认。",
+  "send.viewExplorer": "在区块浏览器中查看",
+  "send.from": "发送方（From）",
+  "send.to": "接收地址",
+  "send.amount": "数量",
+  "send.available": "可用：{amount} {asset}",
+  "send.amountPlaceholder": "请输入发送的 {asset} 数量",
+  "send.mainnetAlertTitle": "{symbol} 为主网，使用真实资金",
+  "send.mainnetAlertDesc": "交易一旦广播不可撤销，请务必核对接收地址与数量。",
+  // —— 右侧广告位 ——
+  "right.ad": "广告",
+  "right.sponsor": "AD · 赞助商位置",
+  "right.ad1Title": "HCoin 理财",
+  "right.ad1Desc": "稳健收益，年化 8%",
+  "right.ad2Title": "邀请好友",
+  "right.ad2Desc": "双方各得 10 HCoin",
+  "right.ad3Title": "安全中心",
+  "right.ad3Desc": "开启二次验证",
+  // —— 关于（主进程分区数据） ——
+  "about.name": "钱包名称",
+  "about.network": "网络环境",
+  "about.version": "客户端版本",
+  "about.storage": "数据存储",
+  "about.totalAccounts": "共 {count} 个账户",
+  // —— 渲染进程错误提示 ——
+  "err.envBackup": "当前环境不支持备份（未检测到 Electron 接口）",
+  "err.envUnlock": "当前环境不支持解锁（未检测到 Electron 接口）",
+  "err.envSend": "当前环境不支持发送（未检测到 Electron 接口）",
+  "err.envCreate": "当前环境不支持创建账户（未检测到 Electron 接口）",
+  "err.envImport": "当前环境不支持导入（未检测到 Electron 接口）",
+  "err.selectBackupAccount": "请选择要备份的账户",
+  "err.selectUnlockAccount": "请选择要解锁的账户",
+  "err.enterPassword": "请输入密码",
+  "err.backupFailed": "备份失败",
+  "err.loadAccountsFailed": "读取账户列表失败",
+  "err.unlockFailed": "解锁失败",
+  "err.startupCheckFailed": "启动检测失败",
+  "err.sendFailed": "发送失败",
+  "err.unlockFirst": "请先解锁钱包",
+  "err.createFailed": "创建账户失败",
+  "err.importFailed": "导入失败",
+  "err.mnemonicGenerateFailed": "助记词生成失败",
+  "err.passwordInvalid": "密码不符合要求",
+  "err.checkPhraseAndPassword": "请检查助记词与密码",
+  "err.mnemonicInvalidInput": "助记词不合法，请检查单词拼写与顺序",
+  "err.mnemonicCheckFailed": "助记词校验失败",
+  "err.wordCountMismatch": "请输入 {total} 个助记词，当前 {current} 个",
+  // —— 主进程错误提示 ——
+  "err.dbNotReady": "数据库尚未就绪，请稍后重试",
+  "err.invalidMnemonic": "助记词不合法",
+  "err.deriveMnemonicInvalid": "助记词不合法，无法派生 ETH 账户",
+  "err.passwordRequired": "密码不能为空",
+  "err.accountExists": "该账户已存在",
+  "err.accountNotFound": "账户不存在",
+  "err.noSecret": "该账户没有可用于备份的加密助记词",
+  "err.wrongPassword": "密码错误，无法解密助记词",
+  "err.chainNotSupported": "不支持的链：{key}",
+  "err.notEvmChain": "链 {name} 不是 EVM 链",
+  "err.tokenNotSupported": "链 {name} 不支持代币：{symbol}",
+  "err.assetNotSupported": "链 {name} 不支持资产：{asset}",
+  "err.btcDeriveFailed": "BTC 账户派生失败",
+  "err.btcAddressFailed": "BTC 地址生成失败",
+  "err.btcAddressInvalid": "无效的 BTC 收款地址",
+  "err.btcApiFailed": "BTC API 请求失败：{status} {statusText}",
+  "err.broadcastFailed": "广播失败：{status} {detail}",
+  "err.amountFormat": "发送数量格式不正确",
+  "err.amountPositive": "请输入有效的发送数量",
+  "err.enterRecipient": "请输入接收地址",
+  "err.noUtxo": "可用余额为 0，无法发送",
+  "err.insufficient": "余额不足以支付发送数量与手续费",
+  "err.solAddressInvalid": "无效的 Solana 收款地址",
+  "err.walletLocked": "钱包未解锁，无法发送",
+  "err.accountMismatch": "当前解锁账户与发送账户不一致"
+};
+const en = {
+  // —— 通用 ——
+  "common.cancel": "Cancel",
+  "common.close": "Close",
+  "common.back": "Back",
+  "common.next": "Next",
+  "common.continue": "Continue",
+  "common.settings": "Settings",
+  "common.send": "Send",
+  "common.password": "Password",
+  "common.confirmPassword": "Confirm password",
+  "common.passwordPlaceholder": "Enter password",
+  "common.confirmPasswordPlaceholder": "Re-enter password",
+  "common.selectAccount": "Select account",
+  "common.account": "Account",
+  "common.asset": "Asset",
+  "common.balance": "Balance",
+  "common.priceUsd": "Price (USD)",
+  "common.valueUsd": "Value (USD)",
+  "common.action": "Action",
+  "common.noData": "No assets",
+  // —— 顶栏 ——
+  "header.notLoggedIn": "Not signed in",
+  // —— 左侧菜单 ——
+  "menu.overview": "Overview",
+  // —— 网络环境 ——
+  "network.env": "Network",
+  "network.mainnet": "Mainnet",
+  "network.testnet": "Testnet",
+  "network.mainnetDesc": "Ethereum / Avalanche / Bitcoin / Solana",
+  "network.testnetDesc": "Sepolia / Fuji / Bitcoin Testnet / Devnet",
+  "network.currentMainnet": "Currently on mainnet",
+  "network.mainnetWarning": "All transfers use real funds and cannot be reversed.",
+  "network.switchTitle": "Switch to mainnet?",
+  "network.switchContent": "Mainnet uses real funds and transactions cannot be reversed once broadcast. Please double-check the address and network.",
+  "network.confirmSwitch": "Confirm",
+  "network.switched": "Switched to {label}",
+  "network.switchFailed": "Failed to switch network",
+  // —— 语言 ——
+  "locale.language": "Language",
+  "locale.zh": "中文",
+  "locale.en": "English",
+  "locale.switched": "Language switched to {label}",
+  // —— 设置 ——
+  "settings.title": "Settings",
+  "settings.backup": "Backup",
+  "settings.about": "About",
+  "settings.notImplemented": "{name} is not available yet",
+  // —— 备份 ——
+  "backup.title": "Back up recovery phrase",
+  "backup.confirm": "Confirm",
+  "backup.enterPasswordTitle": "Enter the password for this account",
+  "backup.enterPasswordDesc": "The password decrypts the recovery phrase stored locally. The phrase will be shown once it checks out.",
+  "backup.noBackable": "No account available for backup. Please create one first.",
+  "backup.noSecret": "(no backup data)",
+  "backup.saveTitle": "Keep your recovery phrase safe",
+  "backup.saveDesc": "This is the decrypted recovery phrase. Do not screenshot it or send it online; it is cleared when this dialog closes.",
+  // —— 解锁 ——
+  "unlock.title": "Unlock wallet",
+  "unlock.action": "Unlock",
+  "unlock.enterPasswordTitle": "Enter the password for this account",
+  "unlock.enterPasswordDesc": "The password decrypts the locally stored recovery phrase, after which the ETH account is derived and shown.",
+  "unlock.success": "Unlocked. ETH account: {address}",
+  // —— 启动流程 ——
+  "startup.welcome": "Welcome to HCoinWallet",
+  "startup.noMnemonic": "No recovery phrase found on this device. Choose how to start:",
+  "startup.createNew": "Create a new recovery phrase",
+  "startup.importExisting": "Import an existing recovery phrase",
+  "startup.slogan": "Secure · Self-custody · Seed phrase stays on this device",
+  "startup.status.checking": "Checking local wallet data…",
+  "startup.status.choose": "No recovery phrase found, please create or import one",
+  "startup.status.create": "Creating a new wallet…",
+  "startup.status.import": "Importing your recovery phrase…",
+  "startup.status.unlock": "Recovery phrase found, please enter your password",
+  "startup.status.ready": "",
+  // —— 创建钱包 ——
+  "create.title": "Create wallet · {step}",
+  "create.stepMnemonic": "Generate phrase",
+  "create.stepVerify": "Verify phrase",
+  "create.stepPassword": "Set password",
+  "create.welcomeDesc": "No recovery phrase exists on this device yet. Finish the steps below to create a wallet; the phrase is encrypted and stored locally.",
+  "create.saveTitle": "Keep your recovery phrase safe",
+  "create.saveDesc": "The phrase is the only way to recover this account. Write it down in order and store it offline. Never screenshot it or send it online — once lost, it cannot be recovered.",
+  "create.emptyMnemonic": "No phrase yet, please wait or reopen this dialog.",
+  "create.verifyTitle": "Enter the words for the numbered slots",
+  "create.verifyDesc": "To confirm your backup, enter the words matching the numbers below.",
+  "create.wordIndex": "Word #{index}",
+  "create.wordPlaceholder": "Enter the word",
+  "create.wordWrong": "Incorrect word, please check and retry",
+  "create.setPasswordTitle": "Set an account password",
+  "create.setPasswordDesc": "The password encrypts the recovery phrase. It must be at least 8 characters and include digits, letters, at least one uppercase letter and one special character.",
+  "create.confirm": "Create",
+  "create.success": "Account created. ETH account: {address}",
+  // —— 导入钱包 ——
+  "import.titlePhrase": "Import phrase · Enter phrase",
+  "import.titlePassword": "Import phrase · Set password",
+  "import.enterPhraseTitle": "Enter your recovery phrase",
+  "import.enterPhraseDesc": "Enter the 12 English words in the original order, separated by spaces, or paste the whole phrase. It is only encrypted and stored on this device.",
+  "import.mnemonic": "Recovery phrase",
+  "import.phrasePlaceholder": "e.g. apple banana cat ... (12 words)",
+  "import.wordCount": "{current} / {total} entered",
+  "import.countError": "The phrase must contain {total} words. Please check and retry.",
+  "import.setPasswordDesc": "The password encrypts the imported recovery phrase. It must be at least 8 characters and include digits, letters, at least one uppercase letter and one special character.",
+  "import.confirm": "Import",
+  "import.success": "Imported. ETH account: {address}",
+  // —— 密码规则 ——
+  "password.minLength": "At least 8 characters",
+  "password.needDigit": "Must contain a digit",
+  "password.needLetter": "Must contain a letter",
+  "password.needUpper": "Must contain an uppercase letter",
+  "password.needSpecial": "Must contain a special character",
+  "password.valid": "Password meets the requirements",
+  "password.mismatch": "Passwords do not match",
+  // —— 总览 ——
+  "overview.chain": "Chain",
+  "overview.totalTitle": "Total value (USD)",
+  "overview.priceSource": "Prices from CoinGecko · updated at {time}",
+  "overview.priceFallback": "Prices from CoinGecko · fallback prices",
+  // —— 单链内容区 ——
+  "content.accountTitle": "{symbol} account",
+  "content.lockedHint": "Wallet is locked. Unlock it to view the {symbol} account.",
+  "content.addressLabel": "{symbol} address",
+  "content.network": "Network",
+  "content.derivationPath": "Derivation path",
+  "content.walletAccount": "Wallet account",
+  "content.subtotal": "Subtotal (USD)",
+  // —— 发送 ——
+  "send.title": "Send",
+  "send.confirm": "Confirm",
+  "send.submitted": "Transaction submitted",
+  "send.broadcast": "Broadcast to {chain} {network}, waiting for confirmation.",
+  "send.viewExplorer": "View on block explorer",
+  "send.from": "From",
+  "send.to": "Recipient address",
+  "send.amount": "Amount",
+  "send.available": "Available: {amount} {asset}",
+  "send.amountPlaceholder": "Enter the {asset} amount to send",
+  "send.mainnetAlertTitle": "{symbol} is on mainnet and uses real funds",
+  "send.mainnetAlertDesc": "Transactions cannot be reversed once broadcast. Please verify the recipient address and amount.",
+  // —— 右侧广告位 ——
+  "right.ad": "Ad",
+  "right.sponsor": "AD · Sponsored",
+  "right.ad1Title": "HCoin Earn",
+  "right.ad1Desc": "Steady returns, 8% APY",
+  "right.ad2Title": "Refer friends",
+  "right.ad2Desc": "Both get 10 HCoin",
+  "right.ad3Title": "Security center",
+  "right.ad3Desc": "Enable two-factor authentication",
+  // —— 关于（主进程分区数据） ——
+  "about.name": "Wallet name",
+  "about.network": "Network",
+  "about.version": "Client version",
+  "about.storage": "Storage",
+  "about.totalAccounts": "{count} accounts",
+  // —— 渲染进程错误提示 ——
+  "err.envBackup": "Backup is unavailable (no Electron interface detected)",
+  "err.envUnlock": "Unlock is unavailable (no Electron interface detected)",
+  "err.envSend": "Sending is unavailable (no Electron interface detected)",
+  "err.envCreate": "Account creation is unavailable (no Electron interface detected)",
+  "err.envImport": "Import is unavailable (no Electron interface detected)",
+  "err.selectBackupAccount": "Select the account to back up",
+  "err.selectUnlockAccount": "Select the account to unlock",
+  "err.enterPassword": "Enter your password",
+  "err.backupFailed": "Backup failed",
+  "err.loadAccountsFailed": "Failed to load the account list",
+  "err.unlockFailed": "Unlock failed",
+  "err.startupCheckFailed": "Startup check failed",
+  "err.sendFailed": "Transaction failed",
+  "err.unlockFirst": "Please unlock the wallet first",
+  "err.createFailed": "Failed to create the account",
+  "err.importFailed": "Import failed",
+  "err.mnemonicGenerateFailed": "Failed to generate the recovery phrase",
+  "err.passwordInvalid": "Password does not meet the requirements",
+  "err.checkPhraseAndPassword": "Please check the recovery phrase and password",
+  "err.mnemonicInvalidInput": "Invalid recovery phrase, please check the words and their order",
+  "err.mnemonicCheckFailed": "Failed to validate the recovery phrase",
+  "err.wordCountMismatch": "Enter {total} words, currently {current}",
+  // —— 主进程错误提示 ——
+  "err.dbNotReady": "Database is not ready, please try again later",
+  "err.invalidMnemonic": "Invalid recovery phrase",
+  "err.deriveMnemonicInvalid": "Invalid recovery phrase, cannot derive the ETH account",
+  "err.passwordRequired": "Password is required",
+  "err.accountExists": "This account already exists",
+  "err.accountNotFound": "Account not found",
+  "err.noSecret": "This account has no encrypted recovery phrase to back up",
+  "err.wrongPassword": "Wrong password, cannot decrypt the recovery phrase",
+  "err.chainNotSupported": "Unsupported chain: {key}",
+  "err.notEvmChain": "{name} is not an EVM chain",
+  "err.tokenNotSupported": "{name} does not support token: {symbol}",
+  "err.assetNotSupported": "{name} does not support asset: {asset}",
+  "err.btcDeriveFailed": "Failed to derive the BTC account",
+  "err.btcAddressFailed": "Failed to generate the BTC address",
+  "err.btcAddressInvalid": "Invalid BTC recipient address",
+  "err.btcApiFailed": "BTC API request failed: {status} {statusText}",
+  "err.broadcastFailed": "Broadcast failed: {status} {detail}",
+  "err.amountFormat": "Invalid amount format",
+  "err.amountPositive": "Enter a valid amount",
+  "err.enterRecipient": "Enter the recipient address",
+  "err.noUtxo": "Available balance is 0, nothing to send",
+  "err.insufficient": "Insufficient balance for the amount and fee",
+  "err.solAddressInvalid": "Invalid Solana recipient address",
+  "err.walletLocked": "Wallet is locked, cannot send",
+  "err.accountMismatch": "The unlocked account does not match the sender"
+};
+const MESSAGES = { zh, en };
+function format(template, params) {
+  if (!params) return template;
+  return template.replace(
+    /\{(\w+)\}/g,
+    (match2, name) => Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match2
+  );
+}
+function translate(locale, key, params) {
+  const dict2 = MESSAGES[locale] ?? MESSAGES.zh;
+  return format(dict2[key] ?? MESSAGES.zh[key], params);
+}
+function isLocale(value) {
+  return value === "zh" || value === "en";
+}
+const LOCALE_FILE = "locale.json";
+let currentLocale = DEFAULT_LOCALE;
+function getLocale() {
+  return currentLocale;
+}
+function localeFilePath() {
+  return path.join(electron.app.getPath("userData"), LOCALE_FILE);
+}
+async function loadLocale() {
+  try {
+    const raw = await fs.readFile(localeFilePath(), "utf8");
+    const parsed = JSON.parse(raw);
+    currentLocale = isLocale(parsed.locale) ? parsed.locale : DEFAULT_LOCALE;
+  } catch {
+    currentLocale = DEFAULT_LOCALE;
+  }
+  return currentLocale;
+}
+async function setLocale(locale) {
+  if (!isLocale(locale)) {
+    throw new Error(`不支持的语言：${String(locale)}`);
+  }
+  currentLocale = locale;
+  try {
+    await fs.writeFile(localeFilePath(), JSON.stringify({ locale }), "utf8");
+  } catch (err) {
+    console.error("[locale] 持久化语言失败:", err);
+  }
+  return currentLocale;
+}
+function t(key, params) {
+  return translate(currentLocale, key, params);
+}
 const ETH_DERIVE_PATH = "m/44'/60'/0'/0/0";
 const CHAIN_DEFS = [
   {
@@ -22001,17 +22458,17 @@ function getSupportedChains(network = getNetwork()) {
 }
 function getChain(chainKey, network = getNetwork()) {
   const chain2 = getSupportedChains(network).find((c) => c.key === chainKey);
-  if (!chain2) throw new Error(`不支持的链：${chainKey}`);
+  if (!chain2) throw new Error(t("err.chainNotSupported", { key: chainKey }));
   return chain2;
 }
 function getEvmChain(chainKey, network = getNetwork()) {
   const chain2 = getChain(chainKey, network);
-  if (chain2.kind !== "evm") throw new Error(`链 ${chain2.name} 不是 EVM 链`);
+  if (chain2.kind !== "evm") throw new Error(t("err.notEvmChain", { name: chain2.name }));
   return chain2;
 }
 function getToken(chain2, symbol) {
-  const token = chain2.tokens.find((t) => t.symbol === symbol);
-  if (!token) throw new Error(`链 ${chain2.name} 不支持代币：${symbol}`);
+  const token = chain2.tokens.find((t2) => t2.symbol === symbol);
+  if (!token) throw new Error(t("err.tokenNotSupported", { name: chain2.name, symbol }));
   return token;
 }
 const providers = /* @__PURE__ */ new Map();
@@ -22037,7 +22494,7 @@ const ERC20_ABI = [
 function deriveWallet(mnemonic) {
   const phrase = mnemonic.trim().toLowerCase();
   if (!ethers.Mnemonic.isValidMnemonic(phrase)) {
-    throw new Error("助记词不合法，无法派生 ETH 账户");
+    throw new Error(t("err.deriveMnemonicInvalid"));
   }
   return ethers.HDNodeWallet.fromPhrase(phrase, void 0, ETH_DERIVE_PATH);
 }
@@ -23169,13 +23626,13 @@ function tonelliShanks$1(P) {
       throw new Error("Cannot find square root");
     let M = S;
     let c = F.mul(F.ONE, cc);
-    let t = F.pow(n, Q);
+    let t2 = F.pow(n, Q);
     let R = F.pow(n, Q1div2);
-    while (!F.eql(t, F.ONE)) {
-      if (F.is0(t))
+    while (!F.eql(t2, F.ONE)) {
+      if (F.is0(t2))
         throw new Error("Cannot find square root: probably non-prime P");
       let i = 1;
-      let t_tmp = F.sqr(t);
+      let t_tmp = F.sqr(t2);
       while (!F.eql(t_tmp, F.ONE)) {
         i++;
         t_tmp = F.sqr(t_tmp);
@@ -23186,7 +23643,7 @@ function tonelliShanks$1(P) {
       const b = F.pow(c, exponent);
       M = i;
       c = F.sqr(b);
-      t = F.mul(t, c);
+      t2 = F.mul(t2, c);
       R = F.mul(R, b);
     }
     return R;
@@ -23515,10 +23972,10 @@ function getWindowSize$1(P) {
 }
 function oddMultiples$1(p, size) {
   const dbl = p.double();
-  const t = [p];
+  const t2 = [p];
   for (let j = 1; j < size; j++)
-    t.push(t[j - 1].add(dbl));
-  return t;
+    t2.push(t2[j - 1].add(dbl));
+  return t2;
 }
 function wnafDigits$1(n, W) {
   const size = 2 ** W;
@@ -23929,8 +24386,8 @@ const _DER$1 = {
       if (len.length / 2 & 128)
         throw new E("tlv.encode: long form length too big");
       const lenLen = dataLen > 127 ? numberToHexUnpadded$1(len.length / 2 | 128) : "";
-      const t = numberToHexUnpadded$1(tag);
-      return t + lenLen + len + data;
+      const t2 = numberToHexUnpadded$1(tag);
+      return t2 + lenLen + len + data;
     },
     // v - value, l - left bytes (unparsed)
     decode(tag, data) {
@@ -24051,10 +24508,10 @@ function _splitEndoScalar$1(k, basis, n) {
   }
   return { k1neg, k1, k2neg, k2 };
 }
-function validateSigFormat$1(format) {
-  if (!["compact", "recovered", "der"].includes(format))
+function validateSigFormat$1(format2) {
+  if (!["compact", "recovered", "der"].includes(format2))
     throw new Error('Signature format must be "compact", "recovered", or "der"');
-  return format;
+  return format2;
 }
 function validateSigOpts$1(opts, def2) {
   validateObject$2(opts);
@@ -24639,10 +25096,10 @@ function ecdsa$1(Point2, hash, ecdsaOpts = {}) {
     if (hasLargeRecoveryLifts)
       throw new Error('"recovered" sig type is not supported for cofactor >2 curves');
   }
-  function validateSigLength(bytes, format) {
-    validateSigFormat$1(format);
+  function validateSigLength(bytes, format2) {
+    validateSigFormat$1(format2);
     const size = lengths.signature;
-    const sizer = format === "compact" ? size : format === "recovered" ? size + 1 : void 0;
+    const sizer = format2 === "compact" ? size : format2 === "recovered" ? size + 1 : void 0;
     return abytes$3(bytes, sizer);
   }
   class Signature {
@@ -24660,18 +25117,18 @@ function ecdsa$1(Point2, hash, ecdsaOpts = {}) {
       }
       Object.freeze(this);
     }
-    static fromBytes(bytes, format = defaultSigOpts.format) {
-      validateSigLength(bytes, format);
+    static fromBytes(bytes, format2 = defaultSigOpts.format) {
+      validateSigLength(bytes, format2);
       let recid;
-      if (format === "der") {
+      if (format2 === "der") {
         if (bytes.length > 2 * Fn2.BYTES + 16)
           throw new DER$1.Err("invalid signature: DER signature too long");
         const { r: r2, s: s2 } = DER$1.toSig(abytes$3(bytes), Fn2.BYTES + 1);
         return new Signature(r2, s2);
       }
-      if (format === "recovered") {
+      if (format2 === "recovered") {
         recid = bytes[0];
-        format = "compact";
+        format2 = "compact";
         bytes = bytes.subarray(1);
       }
       const L = lengths.signature / 2;
@@ -24679,8 +25136,8 @@ function ecdsa$1(Point2, hash, ecdsaOpts = {}) {
       const s = bytes.subarray(L, L * 2);
       return new Signature(Fn2.fromBytes(r), Fn2.fromBytes(s), recid);
     }
-    static fromHex(hex2, format) {
-      return this.fromBytes(hexToBytes$2(hex2), format);
+    static fromHex(hex2, format2) {
+      return this.fromBytes(hexToBytes$2(hex2), format2);
     }
     assertRecovery() {
       const { recovery } = this;
@@ -24715,21 +25172,21 @@ function ecdsa$1(Point2, hash, ecdsaOpts = {}) {
     hasHighS() {
       return isBiggerThanHalfOrder(this.s);
     }
-    toBytes(format = defaultSigOpts.format) {
-      validateSigFormat$1(format);
-      if (format === "der")
+    toBytes(format2 = defaultSigOpts.format) {
+      validateSigFormat$1(format2);
+      if (format2 === "der")
         return hexToBytes$2(DER$1.hexFromSig(this));
       const { r, s } = this;
       const rb = Fn2.toBytes(r);
       const sb = Fn2.toBytes(s);
-      if (format === "recovered") {
+      if (format2 === "recovered") {
         assertRecoverableCurve();
         return concatBytes$4(Uint8Array.of(this.assertRecovery()), rb, sb);
       }
       return concatBytes$4(rb, sb);
     }
-    toHex(format) {
-      return bytesToHex$2(this.toBytes(format));
+    toHex(format2) {
+      return bytesToHex$2(this.toBytes(format2));
     }
   }
   Object.freeze(Signature.prototype);
@@ -24805,16 +25262,16 @@ function ecdsa$1(Point2, hash, ecdsaOpts = {}) {
     return sig.toBytes(opts2.format);
   }
   function verify(signature, message, publicKey, opts2 = {}) {
-    const { lowS, prehash, format } = validateSigOpts$1(opts2, defaultSigOpts);
+    const { lowS, prehash, format: format2 } = validateSigOpts$1(opts2, defaultSigOpts);
     publicKey = abytes$3(publicKey, void 0, "publicKey");
     message = validateMsgAndHash(message, prehash);
     if (!isBytes$5(signature)) {
       const end = signature instanceof Signature ? ", use sig.toBytes()" : "";
       throw new Error("verify expects Uint8Array signature" + end);
     }
-    validateSigLength(signature, format);
+    validateSigLength(signature, format2);
     try {
-      const sig = Signature.fromBytes(signature, format);
+      const sig = Signature.fromBytes(signature, format2);
       const P = Point2.fromBytes(publicKey);
       if (P.is0())
         return false;
@@ -24832,7 +25289,7 @@ function ecdsa$1(Point2, hash, ecdsaOpts = {}) {
       const v = Fn2.create(q.x);
       if (v !== r)
         return false;
-      if (format === "recovered" && sig.recovery !== getRecoveryBit(q.x, q.y, r))
+      if (format2 === "recovered" && sig.recovery !== getRecoveryBit(q.x, q.y, r))
         return false;
       return true;
     } catch (e) {
@@ -26757,13 +27214,13 @@ function tonelliShanks(P) {
       throw new Error("Cannot find square root");
     let M = S;
     let c = F.mul(F.ONE, cc);
-    let t = F.pow(n, Q);
+    let t2 = F.pow(n, Q);
     let R = F.pow(n, Q1div2);
-    while (!F.eql(t, F.ONE)) {
-      if (F.is0(t))
+    while (!F.eql(t2, F.ONE)) {
+      if (F.is0(t2))
         throw new Error("Cannot find square root: probably non-prime P");
       let i = 1;
-      let t_tmp = F.sqr(t);
+      let t_tmp = F.sqr(t2);
       while (!F.eql(t_tmp, F.ONE)) {
         i++;
         t_tmp = F.sqr(t_tmp);
@@ -26774,7 +27231,7 @@ function tonelliShanks(P) {
       const b = F.pow(c, exponent);
       M = i;
       c = F.sqr(b);
-      t = F.mul(t, c);
+      t2 = F.mul(t2, c);
       R = F.mul(R, b);
     }
     return R;
@@ -27103,10 +27560,10 @@ function getWindowSize(P) {
 }
 function oddMultiples(p, size) {
   const dbl = p.double();
-  const t = [p];
+  const t2 = [p];
   for (let j = 1; j < size; j++)
-    t.push(t[j - 1].add(dbl));
-  return t;
+    t2.push(t2[j - 1].add(dbl));
+  return t2;
 }
 function wnafDigits(n, W) {
   const size = 2 ** W;
@@ -27517,8 +27974,8 @@ const _DER = {
       if (len.length / 2 & 128)
         throw new E("tlv.encode: long form length too big");
       const lenLen = dataLen > 127 ? numberToHexUnpadded(len.length / 2 | 128) : "";
-      const t = numberToHexUnpadded(tag);
-      return t + lenLen + len + data;
+      const t2 = numberToHexUnpadded(tag);
+      return t2 + lenLen + len + data;
     },
     // v - value, l - left bytes (unparsed)
     decode(tag, data) {
@@ -27639,10 +28096,10 @@ function _splitEndoScalar(k, basis, n) {
   }
   return { k1neg, k1, k2neg, k2 };
 }
-function validateSigFormat(format) {
-  if (!["compact", "recovered", "der"].includes(format))
+function validateSigFormat(format2) {
+  if (!["compact", "recovered", "der"].includes(format2))
     throw new Error('Signature format must be "compact", "recovered", or "der"');
-  return format;
+  return format2;
 }
 function validateSigOpts(opts, def2) {
   validateObject$1(opts);
@@ -28227,10 +28684,10 @@ function ecdsa(Point2, hash, ecdsaOpts = {}) {
     if (hasLargeRecoveryLifts)
       throw new Error('"recovered" sig type is not supported for cofactor >2 curves');
   }
-  function validateSigLength(bytes, format) {
-    validateSigFormat(format);
+  function validateSigLength(bytes, format2) {
+    validateSigFormat(format2);
     const size = lengths.signature;
-    const sizer = format === "compact" ? size : format === "recovered" ? size + 1 : void 0;
+    const sizer = format2 === "compact" ? size : format2 === "recovered" ? size + 1 : void 0;
     return abytes(bytes, sizer);
   }
   class Signature {
@@ -28248,18 +28705,18 @@ function ecdsa(Point2, hash, ecdsaOpts = {}) {
       }
       Object.freeze(this);
     }
-    static fromBytes(bytes, format = defaultSigOpts.format) {
-      validateSigLength(bytes, format);
+    static fromBytes(bytes, format2 = defaultSigOpts.format) {
+      validateSigLength(bytes, format2);
       let recid;
-      if (format === "der") {
+      if (format2 === "der") {
         if (bytes.length > 2 * Fn2.BYTES + 16)
           throw new DER.Err("invalid signature: DER signature too long");
         const { r: r2, s: s2 } = DER.toSig(abytes(bytes), Fn2.BYTES + 1);
         return new Signature(r2, s2);
       }
-      if (format === "recovered") {
+      if (format2 === "recovered") {
         recid = bytes[0];
-        format = "compact";
+        format2 = "compact";
         bytes = bytes.subarray(1);
       }
       const L = lengths.signature / 2;
@@ -28267,8 +28724,8 @@ function ecdsa(Point2, hash, ecdsaOpts = {}) {
       const s = bytes.subarray(L, L * 2);
       return new Signature(Fn2.fromBytes(r), Fn2.fromBytes(s), recid);
     }
-    static fromHex(hex2, format) {
-      return this.fromBytes(hexToBytes(hex2), format);
+    static fromHex(hex2, format2) {
+      return this.fromBytes(hexToBytes(hex2), format2);
     }
     assertRecovery() {
       const { recovery } = this;
@@ -28303,21 +28760,21 @@ function ecdsa(Point2, hash, ecdsaOpts = {}) {
     hasHighS() {
       return isBiggerThanHalfOrder(this.s);
     }
-    toBytes(format = defaultSigOpts.format) {
-      validateSigFormat(format);
-      if (format === "der")
+    toBytes(format2 = defaultSigOpts.format) {
+      validateSigFormat(format2);
+      if (format2 === "der")
         return hexToBytes(DER.hexFromSig(this));
       const { r, s } = this;
       const rb = Fn2.toBytes(r);
       const sb = Fn2.toBytes(s);
-      if (format === "recovered") {
+      if (format2 === "recovered") {
         assertRecoverableCurve();
         return concatBytes$2(Uint8Array.of(this.assertRecovery()), rb, sb);
       }
       return concatBytes$2(rb, sb);
     }
-    toHex(format) {
-      return bytesToHex(this.toBytes(format));
+    toHex(format2) {
+      return bytesToHex(this.toBytes(format2));
     }
   }
   Object.freeze(Signature.prototype);
@@ -28393,16 +28850,16 @@ function ecdsa(Point2, hash, ecdsaOpts = {}) {
     return sig.toBytes(opts2.format);
   }
   function verify(signature, message, publicKey, opts2 = {}) {
-    const { lowS, prehash, format } = validateSigOpts(opts2, defaultSigOpts);
+    const { lowS, prehash, format: format2 } = validateSigOpts(opts2, defaultSigOpts);
     publicKey = abytes(publicKey, void 0, "publicKey");
     message = validateMsgAndHash(message, prehash);
     if (!isBytes$2(signature)) {
       const end = signature instanceof Signature ? ", use sig.toBytes()" : "";
       throw new Error("verify expects Uint8Array signature" + end);
     }
-    validateSigLength(signature, format);
+    validateSigLength(signature, format2);
     try {
-      const sig = Signature.fromBytes(signature, format);
+      const sig = Signature.fromBytes(signature, format2);
       const P = Point2.fromBytes(publicKey);
       if (P.is0())
         return false;
@@ -28420,7 +28877,7 @@ function ecdsa(Point2, hash, ecdsaOpts = {}) {
       const v = Fn2.create(q.x);
       if (v !== r)
         return false;
-      if (format === "recovered" && sig.recovery !== getRecoveryBit(q.x, q.y, r))
+      if (format2 === "recovered" && sig.recovery !== getRecoveryBit(q.x, q.y, r))
         return false;
       return true;
     } catch (e) {
@@ -28539,8 +28996,8 @@ function schnorrSign(message, secretKey, auxRand = randomBytes$1(32)) {
   const m = copyBytes(abytes(message, void 0, "message"));
   const { bytes: px, scalar: d } = schnorrGetExtPubKey(secretKey);
   const a = abytes(auxRand, 32, "auxRand");
-  const t = Fn2.toBytes(d ^ num(taggedHash("BIP0340/aux", a)));
-  const rand = taggedHash("BIP0340/nonce", t, px, m);
+  const t2 = Fn2.toBytes(d ^ num(taggedHash("BIP0340/aux", a)));
+  const rand = taggedHash("BIP0340/nonce", t2, px, m);
   const k_ = Fn2.create(num(rand));
   if (k_ === _0n$5)
     throw new Error("sign failed: k is zero");
@@ -30149,8 +30606,8 @@ function validatePubkey(pub, type) {
 }
 function tapTweak(a, b) {
   const u = schnorr.utils;
-  const t = u.taggedHash("TapTweak", a, b);
-  const tn = bytesToNumberBE(t);
+  const t2 = u.taggedHash("TapTweak", a, b);
+  const tn = bytesToNumberBE(t2);
   if (tn >= CURVE_ORDER)
     throw new Error("tweak higher than curve order");
   return tn;
@@ -30162,15 +30619,15 @@ function taprootTweakPrivKey(privKey, merkleRoot = Uint8Array.of()) {
   const P = Point.BASE.multiply(seckey0);
   const seckey = hasEven(P.y) ? seckey0 : Fn.neg(seckey0);
   const xP = u.pointToBytes(P);
-  const t = tapTweak(xP, merkleRoot);
-  return numberToBytesBE(Fn.add(seckey, t), 32);
+  const t2 = tapTweak(xP, merkleRoot);
+  return numberToBytesBE(Fn.add(seckey, t2), 32);
 }
 function taprootTweakPubkey(pubKey, h) {
   const u = schnorr.utils;
   abytes(pubKey, 32, "pubKey");
-  const t = tapTweak(pubKey, h);
+  const t2 = tapTweak(pubKey, h);
   const P = u.lift_x(bytesToNumberBE(pubKey));
-  const Q = P.add(Point.BASE.multiply(t));
+  const Q = P.add(Point.BASE.multiply(t2));
   const parity = hasEven(Q.y) ? 0 : 1;
   return [u.pointToBytes(Q), parity];
 }
@@ -30510,7 +30967,7 @@ const _VarBytes = /* @__PURE__ */ (() => Object.freeze(createBytes(CompactSize))
 const VarBytes = _VarBytes;
 const _RawWitness = /* @__PURE__ */ (() => Object.freeze(array(CompactSizeLen, _VarBytes)))();
 const RawWitness = _RawWitness;
-const BTCArray = (t) => array(CompactSize, t);
+const BTCArray = (t2) => array(CompactSize, t2);
 const RawInput = /* @__PURE__ */ (() => Object.freeze(struct({
   txid: createBytes(32, true),
   // hash(prev_tx),
@@ -33162,11 +33619,11 @@ function deriveBtcAccount(mnemonic, network = getNetwork()) {
   const seed = mnemonicToSeedSync_1(mnemonic.trim().toLowerCase());
   const child = HDKey.fromMasterSeed(seed).derive(config.path);
   if (!child.publicKey || !child.privateKey) {
-    throw new Error("BTC 账户派生失败");
+    throw new Error(t("err.btcDeriveFailed"));
   }
   const payment = p2wpkh(child.publicKey, config.network);
   if (!payment.address) {
-    throw new Error("BTC 地址生成失败");
+    throw new Error(t("err.btcAddressFailed"));
   }
   return {
     address: payment.address,
@@ -33187,7 +33644,7 @@ function isValidBtcAddress(address, network = getNetwork()) {
 function btcToSats(amount) {
   const trimmed = amount.trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    throw new Error("发送数量格式不正确");
+    throw new Error(t("err.amountFormat"));
   }
   const [intPart, fracPart = ""] = trimmed.split(".");
   const frac = `${fracPart}00000000`.slice(0, 8);
@@ -33199,7 +33656,7 @@ function satsToBtc(sats) {
 async function apiGet(apiBase, path2) {
   const res = await fetch(`${apiBase}${path2}`);
   if (!res.ok) {
-    throw new Error(`BTC API 请求失败：${res.status} ${res.statusText}`);
+    throw new Error(t("err.btcApiFailed", { status: res.status, statusText: res.statusText }));
   }
   return await res.json();
 }
@@ -33218,17 +33675,17 @@ async function sendBtc(account, to, amount, network = account.network) {
   const config = getBtcNetworkConfig(network);
   const toAddress = to.trim();
   if (!isValidBtcAddress(toAddress, network)) {
-    throw new Error("无效的 BTC 收款地址");
+    throw new Error(t("err.btcAddressInvalid"));
   }
   const sendSats = btcToSats(amount);
   if (sendSats <= 0n) {
-    throw new Error("请输入有效的发送数量");
+    throw new Error(t("err.amountPositive"));
   }
   const payment = p2wpkh(account.publicKey, config.network);
   const feeRate = await fetchFeeRate(config.apiBase);
   const rawUtxos = await apiGet(config.apiBase, `/address/${account.address}/utxo`);
   if (rawUtxos.length === 0) {
-    throw new Error("可用余额为 0，无法发送");
+    throw new Error(t("err.noUtxo"));
   }
   const utxos = rawUtxos.map((u) => ({ txid: u.txid, index: u.vout, value: BigInt(u.value) })).sort((a, b) => b.value > a.value ? 1 : b.value < a.value ? -1 : 0);
   const estimateVsize = (inCount, outCount) => 10 + inCount * 68 + outCount * 31;
@@ -33242,7 +33699,7 @@ async function sendBtc(account, to, amount, network = account.network) {
   }
   const fee = BigInt(Math.ceil(estimateVsize(selected.length, 2) * feeRate));
   if (total < sendSats + fee) {
-    throw new Error("余额不足以支付发送数量与手续费");
+    throw new Error(t("err.insufficient"));
   }
   const change = total - sendSats - fee;
   const tx = new Transaction();
@@ -33266,7 +33723,7 @@ async function sendBtc(account, to, amount, network = account.network) {
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`广播失败：${res.status} ${detail}`.trim());
+    throw new Error(t("err.broadcastFailed", { status: res.status, detail }).trim());
   }
   const txid = (await res.text()).trim();
   return txid || tx.id;
@@ -33341,13 +33798,13 @@ function isValidSolAddress(address) {
 function solToLamports(amount) {
   const trimmed = amount.trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    throw new Error("发送数量格式不正确");
+    throw new Error(t("err.amountFormat"));
   }
   const [intPart, fracPart = ""] = trimmed.split(".");
   const frac = `${fracPart}000000000`.slice(0, 9);
   const lamports = BigInt(intPart) * LAMPORTS_PER_SOL_BI + BigInt(frac);
   if (lamports <= 0n) {
-    throw new Error("请输入有效的发送数量");
+    throw new Error(t("err.amountPositive"));
   }
   return Number(lamports);
 }
@@ -33370,7 +33827,7 @@ async function fetchSolBalance(address, network = getNetwork()) {
 async function sendSol(secretKey, to, amount, network = getNetwork()) {
   const toAddress = to.trim();
   if (!isValidSolAddress(toAddress)) {
-    throw new Error("无效的 Solana 收款地址");
+    throw new Error(t("err.solAddressInvalid"));
   }
   const lamports = solToLamports(amount);
   const connectionInstance = getConnection(network);
@@ -33378,7 +33835,7 @@ async function sendSol(secretKey, to, amount, network = getNetwork()) {
   const fromPubkey = keypair.publicKey;
   const balance = await connectionInstance.getBalance(fromPubkey);
   if (balance < lamports) {
-    throw new Error("余额不足以支付发送数量与手续费");
+    throw new Error(t("err.insufficient"));
   }
   const { blockhash } = await connectionInstance.getLatestBlockhash("confirmed");
   const tx = new web3_js.Transaction().add(
@@ -33491,17 +33948,17 @@ function encryptMnemonic(mnemonic, password) {
 }
 async function createAccount(mnemonic, password) {
   if (!db || db.status !== "open") {
-    throw new Error("数据库尚未就绪，无法创建账户");
+    throw new Error(t("err.dbNotReady"));
   }
   if (!isValidMnemonic(mnemonic)) {
-    throw new Error("助记词不合法");
+    throw new Error(t("err.invalidMnemonic"));
   }
   if (!password) {
-    throw new Error("密码不能为空");
+    throw new Error(t("err.passwordRequired"));
   }
   const address = deriveAddress(mnemonic);
   if (await db.has(accountKey(address))) {
-    throw new Error("该账户已存在");
+    throw new Error(t("err.accountExists"));
   }
   const secret = encryptMnemonic(mnemonic, password);
   const eth = deriveEthAccount(mnemonic);
@@ -33532,7 +33989,7 @@ async function createAccount(mnemonic, password) {
 }
 async function listAccounts() {
   if (!db || db.status !== "open") {
-    throw new Error("数据库尚未就绪，无法读取账户列表");
+    throw new Error(t("err.dbNotReady"));
   }
   const accounts = [];
   for await (const [key, account] of db.iterator()) {
@@ -33551,7 +34008,7 @@ async function listAccounts() {
 }
 async function hasMnemonic() {
   if (!db || db.status !== "open") {
-    throw new Error("数据库尚未就绪，无法检查助记词");
+    throw new Error(t("err.dbNotReady"));
   }
   let first = null;
   for await (const [key, account] of db.iterator()) {
@@ -33565,15 +34022,15 @@ async function hasMnemonic() {
 }
 async function unlockAccountWithSigner(address, password) {
   if (!db || db.status !== "open") {
-    throw new Error("数据库尚未就绪，无法解锁账户");
+    throw new Error(t("err.dbNotReady"));
   }
   if (!address) {
-    throw new Error("请选择要解锁的账户");
+    throw new Error(t("err.selectUnlockAccount"));
   }
   const mnemonic = await decryptMnemonic(address, password);
   const account = await db.get(accountKey(address)).catch(() => null);
   if (!account) {
-    throw new Error("账户不存在");
+    throw new Error(t("err.accountNotFound"));
   }
   let updated = account;
   let ethAddress = account.ethAddress;
@@ -33608,17 +34065,17 @@ async function unlockAccountWithSigner(address, password) {
 }
 async function decryptMnemonic(address, password) {
   if (!db || db.status !== "open") {
-    throw new Error("数据库尚未就绪，无法备份");
+    throw new Error(t("err.dbNotReady"));
   }
   if (!password) {
-    throw new Error("密码不能为空");
+    throw new Error(t("err.passwordRequired"));
   }
   const account = await db.get(accountKey(address)).catch(() => null);
   if (!account) {
-    throw new Error("账户不存在");
+    throw new Error(t("err.accountNotFound"));
   }
   if (!account.secret) {
-    throw new Error("该账户没有可用于备份的加密助记词");
+    throw new Error(t("err.noSecret"));
   }
   const { salt: salt2, iv, tag, ciphertext, scrypt: params } = account.secret;
   try {
@@ -33630,7 +34087,7 @@ async function decryptMnemonic(address, password) {
       decipher.final()
     ]).toString("utf8");
   } catch {
-    throw new Error("密码错误，无法解密助记词");
+    throw new Error(t("err.wrongPassword"));
   }
 }
 async function queryBalance(address) {
@@ -33717,7 +34174,7 @@ async function querySectionData(section) {
       }
       rows.push({
         key: "__summary__",
-        address: `共 ${count} 个账户`,
+        address: t("about.totalAccounts", { count }),
         balance: total.toFixed(2),
         createdAt: "—"
       });
@@ -33751,14 +34208,14 @@ async function querySectionData(section) {
     case "about": {
       const mainnet = getNetwork() === "mainnet";
       return [
-        { key: "name", item: "钱包名称", value: "HCoinWallet" },
+        { key: "name", item: t("about.name"), value: "HCoinWallet" },
         {
           key: "net",
-          item: "网络环境",
-          value: mainnet ? "主网 (Ethereum / Avalanche / Bitcoin / Solana)" : "测试网 (Sepolia / Fuji / Bitcoin Testnet / Solana Devnet)"
+          item: t("about.network"),
+          value: mainnet ? `${t("network.mainnet")} (${t("network.mainnetDesc")})` : `${t("network.testnet")} (${t("network.testnetDesc")})`
         },
-        { key: "ver", item: "客户端版本", value: "v0.0.1" },
-        { key: "db", item: "数据存储", value: "LevelDB (classic-level)" }
+        { key: "ver", item: t("about.version"), value: "v0.0.1" },
+        { key: "db", item: t("about.storage"), value: "LevelDB (classic-level)" }
       ];
     }
     default:
@@ -33865,7 +34322,7 @@ async function pollEthBalancesOnce() {
 function startEthBalancePolling() {
   if (timer) return;
   const network = getNetwork();
-  const summary = getSupportedChains(network).map((c) => `${c.nativeSymbol}/${c.tokens.map((t) => t.symbol).join("/")}（${c.name}）`).join("、");
+  const summary = getSupportedChains(network).map((c) => `${c.nativeSymbol}/${c.tokens.map((t2) => t2.symbol).join("/")}（${c.name}）`).join("、");
   console.log(`[balance] 启动余额轮询（${network === "mainnet" ? "主网" : "测试网"}）：${summary}`);
   void pollEthBalancesOnce();
   timer = setInterval(() => {
@@ -33921,10 +34378,17 @@ electron.app.whenReady().then(async () => {
   } catch (err) {
     console.error("[main] 数据库初始化失败，应用将以只读/无数据方式继续运行:", err);
   }
+  await loadLocale();
   const network = await loadNetwork();
   console.log(`[main] 当前网络环境：${network === "mainnet" ? "主网" : "测试网"}`);
   createWindow();
   startEthBalancePolling();
+  electron.ipcMain.handle("wallet:getLocale", () => {
+    return getLocale();
+  });
+  electron.ipcMain.handle("wallet:setLocale", async (_event, next) => {
+    return setLocale(next);
+  });
   electron.ipcMain.handle("wallet:getNetwork", () => {
     return getNetwork();
   });
@@ -33992,23 +34456,23 @@ electron.app.whenReady().then(async () => {
   electron.ipcMain.handle("wallet:send", async (_event, params) => {
     const { address, chain: chainKey, asset, to, amount } = params ?? {};
     const active = getActiveWallet();
-    if (!active) throw new Error("钱包未解锁，无法发送");
-    if (active.address !== address) throw new Error("当前解锁账户与发送账户不一致");
-    if (!(to == null ? void 0 : to.trim())) throw new Error("请输入接收地址");
+    if (!active) throw new Error(t("err.walletLocked"));
+    if (active.address !== address) throw new Error(t("err.accountMismatch"));
+    if (!(to == null ? void 0 : to.trim())) throw new Error(t("err.enterRecipient"));
     const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) throw new Error("请输入有效的发送数量");
+    if (!Number.isFinite(value) || value <= 0) throw new Error(t("err.amountPositive"));
     const chain2 = getChain(chainKey);
     let txHash;
     if (chain2.kind === "bitcoin") {
       if (asset !== chain2.nativeSymbol) {
-        throw new Error(`链 ${chain2.name} 不支持资产：${asset}`);
+        throw new Error(t("err.assetNotSupported", { name: chain2.name, asset }));
       }
       const btc = getActiveBtcAccount();
-      if (!btc) throw new Error("钱包未解锁，无法发送");
+      if (!btc) throw new Error(t("err.walletLocked"));
       txHash = await sendBtc(btc, to.trim(), String(amount).trim());
     } else if (chain2.kind === "solana") {
       if (asset !== chain2.nativeSymbol) {
-        throw new Error(`链 ${chain2.name} 不支持资产：${asset}`);
+        throw new Error(t("err.assetNotSupported", { name: chain2.name, asset }));
       }
       txHash = await sendSol(active.sol.secretKey, to.trim(), String(amount).trim());
     } else {

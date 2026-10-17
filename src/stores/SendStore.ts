@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { startupStore } from './StartupStore';
 import { networkStore } from './NetworkStore';
+import { localeStore } from './LocaleStore';
 import {
   getChainDisplay,
   buildAssetValue,
@@ -114,10 +115,10 @@ class SendStore {
   async submit(): Promise<string> {
     const api = window.walletAPI;
     if (!api?.send) {
-      throw new Error('当前环境不支持发送（未检测到 Electron 接口）');
+      throw new Error(localeStore.t('err.envSend'));
     }
     const address = startupStore.account?.address;
-    if (!address) throw new Error('请先解锁钱包');
+    if (!address) throw new Error(localeStore.t('err.unlockFirst'));
 
     this.sending = true;
     this.error = null;
@@ -138,7 +139,7 @@ class SendStore {
       return hash;
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '发送失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.sendFailed');
         this.sending = false;
       });
       throw err;

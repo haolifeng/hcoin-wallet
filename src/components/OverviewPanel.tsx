@@ -8,6 +8,7 @@ import { priceStore } from '../stores/PriceStore';
 import { networkStore } from '../stores/NetworkStore';
 import { getChains, buildAssetValue } from '../constants/chains';
 import { formatAmount, formatUsd } from '../utils/format';
+import { useT } from '../i18n/I18nProvider';
 
 const { Title, Text } = Typography;
 
@@ -24,6 +25,7 @@ interface OverviewRow {
 
 /** 总览：按链列出各币种余额、价格与美元估值，并汇总为总额（价格由 App 统一轮询） */
 const OverviewPanel = observer(() => {
+  const t = useT();
   const rows: OverviewRow[] = [];
   let total = 0;
   for (const chain of getChains(networkStore.network)) {
@@ -48,32 +50,32 @@ const OverviewPanel = observer(() => {
 
   const columns: ColumnsType<OverviewRow> = [
     {
-      title: '链',
+      title: t('overview.chain'),
       dataIndex: 'chainName',
       key: 'chainName',
       render: (name: string) => <Tag color="blue">{name}</Tag>,
     },
-    { title: '币种', dataIndex: 'asset', key: 'asset' },
+    { title: t('common.asset'), dataIndex: 'asset', key: 'asset' },
     {
-      title: '余额',
+      title: t('common.balance'),
       dataIndex: 'balance',
       key: 'balance',
       render: (balance: number | undefined) => formatAmount(balance),
     },
     {
-      title: '价格（USD）',
+      title: t('common.priceUsd'),
       dataIndex: 'price',
       key: 'price',
       render: (price: number) => formatUsd(price),
     },
     {
-      title: '估值（USD）',
+      title: t('common.valueUsd'),
       dataIndex: 'value',
       key: 'value',
       render: (value: number) => <Text strong>{formatUsd(value)}</Text>,
     },
     {
-      title: '操作',
+      title: t('common.action'),
       key: 'action',
       width: 100,
       render: (_: unknown, record: OverviewRow) => (
@@ -85,7 +87,7 @@ const OverviewPanel = observer(() => {
             sendStore.open(buildAssetValue(record.chainKey, record.asset), { lockAsset: true })
           }
         >
-          发送
+          {t('common.send')}
         </Button>
       ),
     },
@@ -96,12 +98,13 @@ const OverviewPanel = observer(() => {
       <Title level={3}>{menuStore.currentLabel}</Title>
 
       <Card size="small" style={{ marginBottom: 16 }}>
-        <Statistic title="资产总额（USD）" value={total} precision={2} prefix="$" />
+        <Statistic title={t('overview.totalTitle')} value={total} precision={2} prefix="$" />
         <Text type="secondary" style={{ fontSize: 12 }}>
-          价格来源：CoinGecko ·{' '}
           {priceStore.updatedAt
-            ? `更新于 ${new Date(priceStore.updatedAt).toLocaleTimeString()}`
-            : '暂用兜底价格'}
+            ? t('overview.priceSource', {
+                time: new Date(priceStore.updatedAt).toLocaleTimeString(),
+              })
+            : t('overview.priceFallback')}
         </Text>
       </Card>
 
@@ -111,7 +114,7 @@ const OverviewPanel = observer(() => {
         columns={columns}
         dataSource={rows}
         pagination={false}
-        locale={{ emptyText: '暂无资产' }}
+        locale={{ emptyText: t('common.noData') }}
       />
     </div>
   );

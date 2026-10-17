@@ -13,6 +13,7 @@ import { deriveEthAccount } from '../chains';
 import { deriveBtcAccount } from '../bitcoin';
 import { deriveSolAccount } from '../solana';
 import { getNetwork, type NetworkType } from '../network';
+import { t } from '../locale';
 
 /** 助记词对称加密后的密文结构（只落盘密文，明文永不写入数据库） */
 export interface EncryptedSecret {
@@ -233,18 +234,18 @@ export async function createAccount(
   password: string,
 ): Promise<UnlockResult> {
   if (!db || db.status !== 'open') {
-    throw new Error('数据库尚未就绪，无法创建账户');
+    throw new Error(t('err.dbNotReady'));
   }
   if (!isValidMnemonic(mnemonic)) {
-    throw new Error('助记词不合法');
+    throw new Error(t('err.invalidMnemonic'));
   }
   if (!password) {
-    throw new Error('密码不能为空');
+    throw new Error(t('err.passwordRequired'));
   }
 
   const address = deriveAddress(mnemonic);
   if (await db.has(accountKey(address))) {
-    throw new Error('该账户已存在');
+    throw new Error(t('err.accountExists'));
   }
 
   const secret = encryptMnemonic(mnemonic, password);
@@ -293,7 +294,7 @@ export async function listAccounts(): Promise<
   }[]
 > {
   if (!db || db.status !== 'open') {
-    throw new Error('数据库尚未就绪，无法读取账户列表');
+    throw new Error(t('err.dbNotReady'));
   }
   const accounts: {
     address: string;
@@ -325,7 +326,7 @@ export async function listAccounts(): Promise<
  */
 export async function hasMnemonic(): Promise<MnemonicState> {
   if (!db || db.status !== 'open') {
-    throw new Error('数据库尚未就绪，无法检查助记词');
+    throw new Error(t('err.dbNotReady'));
   }
   let first: { address: string; createdAt: number } | null = null;
   for await (const [key, account] of db.iterator()) {
@@ -355,16 +356,16 @@ export async function unlockAccountWithSigner(
   password: string,
 ): Promise<UnlockSession> {
   if (!db || db.status !== 'open') {
-    throw new Error('数据库尚未就绪，无法解锁账户');
+    throw new Error(t('err.dbNotReady'));
   }
   if (!address) {
-    throw new Error('请选择要解锁的账户');
+    throw new Error(t('err.selectUnlockAccount'));
   }
 
   const mnemonic = await decryptMnemonic(address, password);
   const account = await db.get(accountKey(address)).catch(() => null);
   if (!account) {
-    throw new Error('账户不存在');
+    throw new Error(t('err.accountNotFound'));
   }
 
   let updated = account;
@@ -418,18 +419,18 @@ export async function unlockAccount(address: string, password: string): Promise<
  */
 export async function decryptMnemonic(address: string, password: string): Promise<string> {
   if (!db || db.status !== 'open') {
-    throw new Error('数据库尚未就绪，无法备份');
+    throw new Error(t('err.dbNotReady'));
   }
   if (!password) {
-    throw new Error('密码不能为空');
+    throw new Error(t('err.passwordRequired'));
   }
 
   const account = await db.get(accountKey(address)).catch(() => null);
   if (!account) {
-    throw new Error('账户不存在');
+    throw new Error(t('err.accountNotFound'));
   }
   if (!account.secret) {
-    throw new Error('该账户没有可用于备份的加密助记词');
+    throw new Error(t('err.noSecret'));
   }
 
   const { salt, iv, tag, ciphertext, scrypt: params } = account.secret;
@@ -442,7 +443,7 @@ export async function decryptMnemonic(address: string, password: string): Promis
       decipher.final(),
     ]).toString('utf8');
   } catch {
-    throw new Error('密码错误，无法解密助记词');
+    throw new Error(t('err.wrongPassword'));
   }
 }
 
@@ -575,7 +576,7 @@ export async function querySectionData(section: string): Promise<SectionRow[]> {
       }
       rows.push({
         key: '__summary__',
-        address: `共 ${count} 个账户`,
+        address: t('about.totalAccounts', { count }),
         balance: total.toFixed(2),
         createdAt: '—',
       });
@@ -613,16 +614,16 @@ export async function querySectionData(section: string): Promise<SectionRow[]> {
     case 'about': {
       const mainnet = getNetwork() === 'mainnet';
       return [
-        { key: 'name', item: '钱包名称', value: 'HCoinWallet' },
+        { key: 'name', item: t('about.name'), value: 'HCoinWallet' },
         {
           key: 'net',
-          item: '网络环境',
+          item: t('about.network'),
           value: mainnet
-            ? '主网 (Ethereum / Avalanche / Bitcoin / Solana)'
-            : '测试网 (Sepolia / Fuji / Bitcoin Testnet / Solana Devnet)',
+            ? `${t('network.mainnet')} (${t('network.mainnetDesc')})`
+            : `${t('network.testnet')} (${t('network.testnetDesc')})`,
         },
-        { key: 'ver', item: '客户端版本', value: 'v0.0.1' },
-        { key: 'db', item: '数据存储', value: 'LevelDB (classic-level)' },
+        { key: 'ver', item: t('about.version'), value: 'v0.0.1' },
+        { key: 'db', item: t('about.storage'), value: 'LevelDB (classic-level)' },
       ];
     }
 

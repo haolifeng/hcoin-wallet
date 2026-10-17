@@ -1,6 +1,7 @@
 import { Alert, Button, Input, Modal, Select, Typography, message } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { startupStore } from '../stores/StartupStore';
+import { useT } from '../i18n/I18nProvider';
 
 const { Text } = Typography;
 
@@ -10,20 +11,21 @@ const { Text } = Typography;
  */
 const UnlockModal = observer(() => {
   const store = startupStore;
+  const t = useT();
 
   const handleUnlock = async () => {
     try {
       const { ethAddress } = await store.unlock();
-      message.success(`解锁成功，ETH 账户：${ethAddress}`);
+      message.success(t('unlock.success', { address: ethAddress }));
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '解锁失败');
+      message.error(err instanceof Error ? err.message : t('err.unlockFailed'));
     }
   };
 
   return (
     <Modal
       open={store.phase === 'unlock'}
-      title="解锁钱包"
+      title={t('unlock.title')}
       width={480}
       maskClosable={false}
       closable={false}
@@ -36,21 +38,21 @@ const UnlockModal = observer(() => {
           disabled={!store.selectedAddress || !store.password || store.loading}
           onClick={handleUnlock}
         >
-          解锁
+          {t('unlock.action')}
         </Button>,
       ]}
     >
       <Alert
         type="info"
         showIcon
-        message="请输入该账户的密码"
-        description="密码用于解密本机保存的助记词，验证通过后会派生 ETH 账户并展示在界面上。"
+        message={t('unlock.enterPasswordTitle')}
+        description={t('unlock.enterPasswordDesc')}
         style={{ marginBottom: 16 }}
       />
 
       {store.accounts.length > 1 && (
         <div style={{ marginBottom: 12 }}>
-          <Text strong>选择账户</Text>
+          <Text strong>{t('common.selectAccount')}</Text>
           <Select
             value={store.selectedAddress ?? undefined}
             onChange={(value: string) => store.setSelectedAddress(value)}
@@ -62,7 +64,7 @@ const UnlockModal = observer(() => {
 
       {store.accounts.length === 1 && store.selectedAddress && (
         <div style={{ marginBottom: 12 }}>
-          <Text strong>账户</Text>
+          <Text strong>{t('common.account')}</Text>
           <div style={{ marginTop: 4 }}>
             <Text code style={{ wordBreak: 'break-all' }}>
               {store.selectedAddress}
@@ -72,10 +74,10 @@ const UnlockModal = observer(() => {
       )}
 
       <div>
-        <Text strong>密码</Text>
+        <Text strong>{t('common.password')}</Text>
         <Input.Password
           value={store.password}
-          placeholder="请输入密码"
+          placeholder={t('common.passwordPlaceholder')}
           autoFocus
           onChange={(e) => store.setPassword(e.target.value)}
           onPressEnter={handleUnlock}

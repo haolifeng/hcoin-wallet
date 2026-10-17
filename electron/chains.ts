@@ -10,6 +10,7 @@ import {
   parseUnits,
 } from 'ethers';
 import { getNetwork, type NetworkType } from './network';
+import { t } from './locale';
 
 /** BIP44 标准 EVM 派生路径（ETH 与 AVAX C-Chain 的地址一致，主网/测试网共用） */
 export const ETH_DERIVE_PATH = "m/44'/60'/0'/0/0";
@@ -211,7 +212,7 @@ export function getSupportedChains(network: NetworkType = getNetwork()): ChainCo
 /** 按链 key 获取配置，未知链直接抛错 */
 export function getChain(chainKey: string, network: NetworkType = getNetwork()): ChainConfig {
   const chain = getSupportedChains(network).find((c) => c.key === chainKey);
-  if (!chain) throw new Error(`不支持的链：${chainKey}`);
+  if (!chain) throw new Error(t('err.chainNotSupported', { key: chainKey }));
   return chain;
 }
 
@@ -221,14 +222,14 @@ export function getEvmChain(
   network: NetworkType = getNetwork(),
 ): EvmChainConfig {
   const chain = getChain(chainKey, network);
-  if (chain.kind !== 'evm') throw new Error(`链 ${chain.name} 不是 EVM 链`);
+  if (chain.kind !== 'evm') throw new Error(t('err.notEvmChain', { name: chain.name }));
   return chain;
 }
 
 /** 按链获取代币配置 */
 export function getToken(chain: EvmChainConfig, symbol: string): TokenConfig {
   const token = chain.tokens.find((t) => t.symbol === symbol);
-  if (!token) throw new Error(`链 ${chain.name} 不支持代币：${symbol}`);
+  if (!token) throw new Error(t('err.tokenNotSupported', { name: chain.name, symbol }));
   return token;
 }
 
@@ -266,7 +267,7 @@ const ERC20_ABI = [
 export function deriveWallet(mnemonic: string): HDNodeWallet {
   const phrase = mnemonic.trim().toLowerCase();
   if (!Mnemonic.isValidMnemonic(phrase)) {
-    throw new Error('助记词不合法，无法派生 ETH 账户');
+    throw new Error(t('err.deriveMnemonicInvalid'));
   }
   return HDNodeWallet.fromPhrase(phrase, undefined, ETH_DERIVE_PATH);
 }

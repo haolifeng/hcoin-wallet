@@ -1,41 +1,45 @@
 import { Card, Typography } from 'antd';
+import { useT } from '../i18n/I18nProvider';
+import type { MessageKey } from '../i18n/messages';
 
 const { Text, Paragraph } = Typography;
 
-/** 单个广告位 */
-function AdSlot({ title, desc }: { title: string; desc: string }) {
-  return (
-    <Card size="small" title="广告" style={{ marginBottom: 16 }}>
-      <div
-        style={{
-          height: 120,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #e6f4ff 0%, #f0f5ff 100%)',
-          borderRadius: 6,
-          marginBottom: 8,
-        }}
-      >
-        <Text strong>{title}</Text>
-        <Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
-          {desc}
-        </Paragraph>
-      </div>
-      <Text type="secondary" style={{ fontSize: 12 }}>
-        AD · 赞助商位置
-      </Text>
-    </Card>
-  );
-}
+/** 广告位内容（标题 + 描述），均随语言切换 */
+const AD_SLOTS: { titleKey: MessageKey; descKey: MessageKey }[] = [
+  { titleKey: 'right.ad1Title', descKey: 'right.ad1Desc' },
+  { titleKey: 'right.ad2Title', descKey: 'right.ad2Desc' },
+  { titleKey: 'right.ad3Title', descKey: 'right.ad3Desc' },
+];
 
 const RightPanel = () => {
+  const t = useT();
+
   return (
     <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
-      <AdSlot title="HCoin 理财" desc="稳健收益，年化 8%" />
-      <AdSlot title="邀请好友" desc="双方各得 10 HCoin" />
-      <AdSlot title="安全中心" desc="开启二次验证" />
+      {AD_SLOTS.map((slot) => (
+        <Card key={slot.titleKey} size="small" title={t('right.ad')} style={{ marginBottom: 16 }}>
+          <div
+            style={{
+              height: 120,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #e6f4ff 0%, #f0f5ff 100%)',
+              borderRadius: 6,
+              marginBottom: 8,
+            }}
+          >
+            <Text strong>{t(slot.titleKey)}</Text>
+            <Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
+              {t(slot.descKey)}
+            </Paragraph>
+          </div>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {t('right.sponsor')}
+          </Text>
+        </Card>
+      ))}
     </div>
   );
 };

@@ -1,16 +1,19 @@
 import { Alert, Spin, Typography } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { startupStore, type StartupPhase } from '../stores/StartupStore';
+import { useT } from '../i18n/I18nProvider';
+import type { MessageKey } from '../i18n/messages';
 
 const { Title, Text } = Typography;
 
-const STATUS_TEXT: Record<StartupPhase, string> = {
-  checking: '正在检查本地钱包数据…',
-  choose: '未检测到助记词，请选择创建或导入',
-  create: '正在创建新的助记词钱包…',
-  import: '正在导入已有助记词…',
-  unlock: '已检测到助记词，请输入密码解锁',
-  ready: '',
+/** 各启动阶段的状态文案 key */
+const STATUS_KEY: Record<StartupPhase, MessageKey> = {
+  checking: 'startup.status.checking',
+  choose: 'startup.status.choose',
+  create: 'startup.status.create',
+  import: 'startup.status.import',
+  unlock: 'startup.status.unlock',
+  ready: 'startup.status.ready',
 };
 
 /**
@@ -18,6 +21,7 @@ const STATUS_TEXT: Record<StartupPhase, string> = {
  * 检测数据库 → 无助记词则弹出创建窗口，有助记词则弹出密码窗口。
  */
 const StartupScreen = observer(() => {
+  const t = useT();
   if (startupStore.phase === 'ready') return null;
 
   return (
@@ -38,13 +42,11 @@ const StartupScreen = observer(() => {
       <Title level={2} style={{ color: '#fff', margin: '16px 0 4px' }}>
         HCoinWallet
       </Title>
-      <Text style={{ color: 'rgba(255,255,255,0.65)' }}>
-        安全 · 自托管 · 助记词只保存在本机
-      </Text>
+      <Text style={{ color: 'rgba(255,255,255,0.65)' }}>{t('startup.slogan')}</Text>
 
       <Spin size="large" style={{ marginTop: 36 }} />
       <Text style={{ color: 'rgba(255,255,255,0.85)', marginTop: 16 }}>
-        {STATUS_TEXT[startupStore.phase]}
+        {t(STATUS_KEY[startupStore.phase])}
       </Text>
 
       {startupStore.error && (

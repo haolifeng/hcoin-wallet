@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { validatePassword } from './CreateWalletStore';
+import { localeStore } from './LocaleStore';
 import type { UnlockResult } from '../types/global';
 
 /** BIP39 12 词助记词 */
@@ -68,13 +69,16 @@ class ImportWalletStore {
     const api = window.walletAPI;
     if (!api?.validateMnemonic) {
       runInAction(() => {
-        this.error = '当前环境不支持导入（未检测到 Electron 接口）';
+        this.error = localeStore.t('err.envImport');
       });
       return false;
     }
     if (!this.countOk) {
       runInAction(() => {
-        this.error = `请输入 ${WORD_COUNT} 个助记词，当前 ${this.words.length} 个`;
+        this.error = localeStore.t('err.wordCountMismatch', {
+          total: WORD_COUNT,
+          current: this.words.length,
+        });
       });
       return false;
     }
@@ -86,12 +90,12 @@ class ImportWalletStore {
       runInAction(() => {
         this.valid = ok;
         this.checking = false;
-        if (!ok) this.error = '助记词不合法，请检查单词拼写与顺序';
+        if (!ok) this.error = localeStore.t('err.mnemonicInvalidInput');
       });
       return ok;
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '助记词校验失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.mnemonicCheckFailed');
         this.checking = false;
       });
       return false;
@@ -136,14 +140,14 @@ class ImportWalletStore {
 
   /** 提交导入：与主进程创建账户同一条通路（加密助记词落盘 + 派生 ETH 账户） */
   async submit(): Promise<UnlockResult> {
-    if (!this.canSubmit) throw new Error('请检查助记词与密码');
+    if (!this.canSubmit) throw new Error(localeStore.t('err.checkPhraseAndPassword'));
 
     this.loading = true;
     this.error = null;
     try {
       const api = window.walletAPI;
       if (!api?.createAccount) {
-        throw new Error('当前环境不支持导入（未检测到 Electron 接口）');
+        throw new Error(localeStore.t('err.envImport'));
       }
       const result = await api.createAccount(this.mnemonicPhrase, this.password);
       runInAction(() => {
@@ -152,7 +156,7 @@ class ImportWalletStore {
       return result;
     } catch (err) {
       runInAction(() => {
-        this.error = err instanceof Error ? err.message : '导入失败';
+        this.error = err instanceof Error ? err.message : localeStore.t('err.importFailed');
         this.loading = false;
       });
       throw err;

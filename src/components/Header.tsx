@@ -4,6 +4,7 @@ import { settingsStore } from '../stores/SettingsStore';
 import { startupStore } from '../stores/StartupStore';
 import { networkStore } from '../stores/NetworkStore';
 import { formatAccountAddress } from '../utils/format';
+import { useT } from '../i18n/I18nProvider';
 
 const { Text } = Typography;
 
@@ -12,6 +13,7 @@ const { Text } = Typography;
  * 高度由外层 Layout.Header 固定为 60px，这里只负责横向分布。
  */
 const Header = observer(() => {
+  const t = useT();
   const address = startupStore.account?.address;
 
   return (
@@ -37,11 +39,11 @@ const Header = observer(() => {
           {networkStore.label}
         </Tag>
         <Button size="small" onClick={() => settingsStore.openSettings()}>
-          设置
+          {t('common.settings')}
         </Button>
         <Avatar size="small" style={{ backgroundColor: '#1677ff' }}>H</Avatar>
         <Text style={{ color: 'rgba(255,255,255,0.85)' }}>
-          {address ? formatAccountAddress(address) : '未登录'}
+          {address ? formatAccountAddress(address) : t('header.notLoggedIn')}
         </Text>
       </Space>
     </div>

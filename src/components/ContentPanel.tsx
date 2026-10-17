@@ -7,6 +7,7 @@ import { sendStore } from '../stores/SendStore';
 import { priceStore } from '../stores/PriceStore';
 import { buildAssetValue } from '../constants/chains';
 import { formatAmount, formatUsd } from '../utils/format';
+import { useT } from '../i18n/I18nProvider';
 import ChainAccountCard from './ChainAccountCard';
 import OverviewPanel from './OverviewPanel';
 
@@ -22,6 +23,7 @@ interface AssetRow {
 }
 
 const ContentPanel = observer(() => {
+  const t = useT();
   // 「总览」聚合各链资产；其余菜单项为单链详情
   if (menuStore.selectedKey === 'overview') return <OverviewPanel />;
 
@@ -45,27 +47,27 @@ const ContentPanel = observer(() => {
   const total = rows.reduce((sum, row) => sum + row.value, 0);
 
   const columns: ColumnsType<AssetRow> = [
-    { title: '资产', dataIndex: 'asset', key: 'asset' },
+    { title: t('common.asset'), dataIndex: 'asset', key: 'asset' },
     {
-      title: '余额',
+      title: t('common.balance'),
       dataIndex: 'balance',
       key: 'balance',
       render: (balance: number | undefined) => formatAmount(balance),
     },
     {
-      title: '价格（USD）',
+      title: t('common.priceUsd'),
       dataIndex: 'price',
       key: 'price',
       render: (price: number) => formatUsd(price),
     },
     {
-      title: '估值（USD）',
+      title: t('common.valueUsd'),
       dataIndex: 'value',
       key: 'value',
       render: (value: number) => formatUsd(value),
     },
     {
-      title: '操作',
+      title: t('common.action'),
       key: 'action',
       width: 100,
       render: (_: unknown, record: AssetRow) => (
@@ -77,7 +79,7 @@ const ContentPanel = observer(() => {
             sendStore.open(buildAssetValue(chain.key, record.asset), { lockAsset: true })
           }
         >
-          发送
+          {t('common.send')}
         </Button>
       ),
     },
@@ -96,11 +98,11 @@ const ContentPanel = observer(() => {
         columns={columns}
         dataSource={rows}
         pagination={false}
-        locale={{ emptyText: '暂无资产' }}
+        locale={{ emptyText: t('common.noData') }}
         summary={() => (
           <Table.Summary.Row>
             <Table.Summary.Cell index={0} colSpan={3}>
-              <Text strong>小计（USD）</Text>
+              <Text strong>{t('content.subtotal')}</Text>
             </Table.Summary.Cell>
             <Table.Summary.Cell index={3}>
               <Text strong>{formatUsd(total)}</Text>

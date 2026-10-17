@@ -9,6 +9,7 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import { getNetwork, type NetworkType } from './network';
+import { t } from './locale';
 
 /** BIP44（SLIP-0010 Ed25519）派生路径，与 Phantom 等主流钱包一致（主网 / 测试网共用） */
 export const SOL_DERIVE_PATH = "m/44'/501'/0'/0'";
@@ -135,13 +136,13 @@ export function isValidSolAddress(address: string): boolean {
 function solToLamports(amount: string): number {
   const trimmed = amount.trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    throw new Error('发送数量格式不正确');
+    throw new Error(t('err.amountFormat'));
   }
   const [intPart, fracPart = ''] = trimmed.split('.');
   const frac = `${fracPart}000000000`.slice(0, 9);
   const lamports = BigInt(intPart) * LAMPORTS_PER_SOL_BI + BigInt(frac);
   if (lamports <= 0n) {
-    throw new Error('请输入有效的发送数量');
+    throw new Error(t('err.amountPositive'));
   }
   return Number(lamports);
 }
@@ -188,7 +189,7 @@ export async function sendSol(
 ): Promise<string> {
   const toAddress = to.trim();
   if (!isValidSolAddress(toAddress)) {
-    throw new Error('无效的 Solana 收款地址');
+    throw new Error(t('err.solAddressInvalid'));
   }
   const lamports = solToLamports(amount);
 
@@ -198,7 +199,7 @@ export async function sendSol(
 
   const balance = await connectionInstance.getBalance(fromPubkey);
   if (balance < lamports) {
-    throw new Error('余额不足以支付发送数量与手续费');
+    throw new Error(t('err.insufficient'));
   }
 
   const { blockhash } = await connectionInstance.getLatestBlockhash('confirmed');
