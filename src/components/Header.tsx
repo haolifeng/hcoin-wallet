@@ -1,7 +1,8 @@
-import { Avatar, Button, Space, Typography } from 'antd';
+import { Avatar, Button, Space, Tag, Typography } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { settingsStore } from '../stores/SettingsStore';
 import { startupStore } from '../stores/StartupStore';
+import { networkStore } from '../stores/NetworkStore';
 import { formatAccountAddress } from '../utils/format';
 
 const { Text } = Typography;
@@ -30,8 +31,11 @@ const Header = observer(() => {
         </Text>
       </div>
 
-      {/* 右：用户区（数据库账户地址替代原 Admin） */}
+      {/* 右：当前网络环境 + 用户区（数据库账户地址替代原 Admin） */}
       <Space size={8} style={{ flexShrink: 0 }}>
+        <Tag color={networkStore.isMainnet ? 'red' : 'orange'} style={{ marginInlineEnd: 0 }}>
+          {networkStore.label}
+        </Tag>
         <Button size="small" onClick={() => settingsStore.openSettings()}>
           设置
         </Button>

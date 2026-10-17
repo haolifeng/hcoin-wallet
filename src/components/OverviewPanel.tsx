@@ -5,7 +5,8 @@ import { menuStore } from '../stores/MenuStore';
 import { startupStore } from '../stores/StartupStore';
 import { sendStore } from '../stores/SendStore';
 import { priceStore } from '../stores/PriceStore';
-import { CHAINS, buildAssetValue } from '../constants/chains';
+import { networkStore } from '../stores/NetworkStore';
+import { getChains, buildAssetValue } from '../constants/chains';
 import { formatAmount, formatUsd } from '../utils/format';
 
 const { Title, Text } = Typography;
@@ -25,7 +26,7 @@ interface OverviewRow {
 const OverviewPanel = observer(() => {
   const rows: OverviewRow[] = [];
   let total = 0;
-  for (const chain of CHAINS) {
+  for (const chain of getChains(networkStore.network)) {
     const balances = startupStore.chainBalances[chain.key];
     for (const symbol of [chain.nativeSymbol, ...chain.tokens]) {
       const balance =

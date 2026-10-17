@@ -1,6 +1,12 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { startupStore } from './StartupStore';
-import { CHAINS, buildAssetValue, resolveChainAddress, type ChainDisplay } from '../constants/chains';
+import { networkStore } from './NetworkStore';
+import {
+  getChainDisplay,
+  buildAssetValue,
+  resolveChainAddress,
+  type ChainDisplay,
+} from '../constants/chains';
 
 /**
  * 发送交易弹窗状态。
@@ -72,9 +78,9 @@ class SendStore {
     this.amount = value;
   }
 
-  /** 当前选中链的展示配置 */
+  /** 当前选中链的展示配置（随网络环境变化） */
   get currentChain(): ChainDisplay | undefined {
-    return CHAINS.find((c) => c.key === this.chain);
+    return getChainDisplay(this.chain, networkStore.network);
   }
 
   /** 当前链上的发送方地址（from） */
@@ -89,7 +95,7 @@ class SendStore {
   get available(): number | undefined {
     const balances = startupStore.chainBalances[this.chain];
     if (!balances) return undefined;
-    const chain = CHAINS.find((c) => c.key === this.chain);
+    const chain = this.currentChain;
     if (this.asset === chain?.nativeSymbol) return balances.native;
     return balances.tokens?.[this.asset];
   }

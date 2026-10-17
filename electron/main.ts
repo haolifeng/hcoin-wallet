@@ -13,12 +13,25 @@ import {
   hasMnemonic,
   unlockAccountWithSigner,
   closeDatabase,
+  type UnlockResult,
 } from './db';
 import { startEthBalancePolling, stopEthBalancePolling, pollEthBalancesOnce } from './balance-poller';
-import { deriveWallet, getChain, sendNative, sendChainToken } from './chains';
+import {
+  deriveWallet,
+  getChain,
+  sendNative,
+  sendChainToken,
+  resetChainProviders,
+} from './chains';
 import { deriveBtcAccount, sendBtc } from './bitcoin';
-import { deriveSolAccount, sendSol } from './solana';
-import { setActiveWallet, getActiveWallet, clearActiveWallet } from './session';
+import { deriveSolAccount, sendSol, resetSolConnections } from './solana';
+import { loadNetwork, setNetwork, getNetwork, type NetworkType } from './network';
+import {
+  setActiveWallet,
+  getActiveWallet,
+  getActiveBtcAccount,
+  clearActiveWallet,
+} from './session';
 
 /** 发送请求参数 */
 interface SendParams {
@@ -67,10 +80,40 @@ app.whenReady().then(async () => {
     // 数据库初始化失败不应导致应用静默崩溃
     console.error('[main] 数据库初始化失败，应用将以只读/无数据方式继续运行:', err);
   }
+
+  // 恢复上次选择的网络环境（主网 / 测试网），必须在任何链操作之前完成
+  const network = await loadNetwork();
+  console.log(`[main] 当前网络环境：${network === 'mainnet' ? '主网' : '测试网'}`);
+
   createWindow();
 
-  // 后台轮询各测试网（Sepolia / Fuji）余额并写入数据库，供渲染进程查询
+  // 后台轮询当前网络环境下各链余额并写入数据库，供渲染进程查询
   startEthBalancePolling();
+
+  // IPC：读取当前网络环境
+  ipcMain.handle('wallet:getNetwork', () => {
+    return getNetwork();
+  });
+
+  // IPC：切换网络环境（主网 ↔ 测试网）。
+  // 切换后释放旧的 RPC 连接、按新网络重新轮询余额，并回传新的 BTC 地址（主网 / 测试网派生路径不同）
+  ipcMain.handle('wallet:setNetwork', async (_event, next: NetworkType) => {
+    const applied = await setNetwork(next);
+    resetChainProviders();
+    resetSolConnections();
+    void pollEthBalancesOnce();
+
+    const active = getActiveWallet();
+    if (!active) return { network: applied, account: null };
+    const btc = getActiveBtcAccount();
+    const account: UnlockResult = {
+      address: active.address,
+      ethAddress: active.wallet.address,
+      btcAddress: btc?.address ?? '',
+      solAddress: active.sol.address,
+    };
+    return { network: applied, account };
+  });
 
   // IPC：渲染进程请求余额
   ipcMain.handle('wallet:getBalance', (_event, address: string) => {
@@ -101,11 +144,12 @@ app.whenReady().then(async () => {
   // 创建与导入共用：导入时传入的是用户已有的助记词，同样加密落盘并派生 ETH 账户
   ipcMain.handle('wallet:createAccount', async (_event, mnemonic: string, password: string) => {
     const result = await createAccount(mnemonic, password);
-    // 建立签名会话（EVM + BTC + SOL 私钥仅存于主进程内存），随后立即触发一次余额轮询
+    // 建立签名会话（EVM + BTC + SOL 私钥仅存于主进程内存），随后立即触发一次余额轮询。
+    // BTC 主网 / 测试网派生路径不同，两个账户都派生并缓存，切换网络时无需重新解密
     setActiveWallet(
       result.address,
       deriveWallet(mnemonic),
-      deriveBtcAccount(mnemonic),
+      { mainnet: deriveBtcAccount(mnemonic, 'mainnet'), testnet: deriveBtcAccount(mnemonic, 'testnet') },
       deriveSolAccount(mnemonic),
     );
     void pollEthBalancesOnce();
@@ -133,7 +177,7 @@ app.whenReady().then(async () => {
     setActiveWallet(
       result.address,
       deriveWallet(mnemonic),
-      deriveBtcAccount(mnemonic),
+      { mainnet: deriveBtcAccount(mnemonic, 'mainnet'), testnet: deriveBtcAccount(mnemonic, 'testnet') },
       deriveSolAccount(mnemonic),
     );
     return result;
@@ -157,7 +201,10 @@ app.whenReady().then(async () => {
       if (asset !== chain.nativeSymbol) {
         throw new Error(`链 ${chain.name} 不支持资产：${asset}`);
       }
-      txHash = await sendBtc(active.btc, to.trim(), String(amount).trim());
+      // 取当前网络环境下派生的 BTC 账户（主网 / 测试网私钥不同）
+      const btc = getActiveBtcAccount();
+      if (!btc) throw new Error('钱包未解锁，无法发送');
+      txHash = await sendBtc(btc, to.trim(), String(amount).trim());
     } else if (chain.kind === 'solana') {
       if (asset !== chain.nativeSymbol) {
         throw new Error(`链 ${chain.name} 不支持资产：${asset}`);

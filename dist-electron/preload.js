@@ -1,6 +1,8 @@
 "use strict";
 const electron = require("electron");
 electron.contextBridge.exposeInMainWorld("walletAPI", {
+  getNetwork: () => electron.ipcRenderer.invoke("wallet:getNetwork"),
+  setNetwork: (network) => electron.ipcRenderer.invoke("wallet:setNetwork", network),
   getBalance: (address) => electron.ipcRenderer.invoke("wallet:getBalance", address),
   getChainBalances: (address) => electron.ipcRenderer.invoke("wallet:getChainBalances", address),
   getSectionData: (section) => electron.ipcRenderer.invoke("wallet:getSectionData", section),

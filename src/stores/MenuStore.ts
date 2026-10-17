@@ -1,5 +1,6 @@
 import { makeAutoObservable } from 'mobx';
-import { CHAINS, type ChainDisplay } from '../constants/chains';
+import { getChainDisplay, type ChainDisplay } from '../constants/chains';
+import { networkStore } from './NetworkStore';
 
 export interface MenuItem {
   key: string;
@@ -33,9 +34,9 @@ export class MenuStore {
     this.selectedKey = key;
   }
 
-  /** 当前选中链的展示配置（找不到时返回 undefined） */
+  /** 当前选中链的展示配置（随网络环境变化，找不到时返回 undefined） */
   get currentChain(): ChainDisplay | undefined {
-    return CHAINS.find((c) => c.key === this.selectedKey);
+    return getChainDisplay(this.selectedKey, networkStore.network);
   }
 
   /** 当前选中菜单项的文字 */

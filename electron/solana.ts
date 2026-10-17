@@ -8,18 +8,45 @@ import {
   Transaction,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
+import { getNetwork, type NetworkType } from './network';
 
-/** BIP44（SLIP-0010 Ed25519）主网派生路径，与 Phantom 等主流钱包一致 */
+/** BIP44（SLIP-0010 Ed25519）派生路径，与 Phantom 等主流钱包一致（主网 / 测试网共用） */
 export const SOL_DERIVE_PATH = "m/44'/501'/0'/0'";
-/** 网络名称 */
-export const SOL_NETWORK_NAME = 'Solana';
+
+/** 某个网络环境下的 Solana 配置 */
+export interface SolNetworkConfig {
+  /** 网络名称 */
+  name: string;
+  /** JSON-RPC 节点 */
+  rpcUrl: string;
+  /** 区块浏览器交易地址前缀 */
+  explorerTxUrl: string;
+  /** 追加在交易哈希之后的查询参数（devnet 需要 ?cluster=devnet） */
+  explorerTxSuffix?: string;
+}
+
 /**
- * 主网 JSON-RPC 节点。官方 api.mainnet-beta.solana.com 常被限流/不可达，
+ * 主网配置。官方 api.mainnet-beta.solana.com 常被限流/不可达，
  * 默认使用 publicnode，可通过环境变量 SOL_RPC_URL 覆盖。
  */
-export const SOL_RPC_URL = process.env.SOL_RPC_URL ?? 'https://solana-rpc.publicnode.com';
-/** 区块浏览器交易地址前缀 */
-export const SOL_EXPLORER_TX_URL = 'https://explorer.solana.com/tx/';
+const SOL_MAINNET_CONFIG: SolNetworkConfig = {
+  name: 'Solana',
+  rpcUrl: process.env.SOL_RPC_URL ?? 'https://solana-rpc.publicnode.com',
+  explorerTxUrl: 'https://explorer.solana.com/tx/',
+};
+
+/** 测试网（Devnet）配置，可通过环境变量 SOL_DEVNET_RPC_URL 覆盖 */
+const SOL_TESTNET_CONFIG: SolNetworkConfig = {
+  name: 'Solana Devnet',
+  rpcUrl: process.env.SOL_DEVNET_RPC_URL ?? 'https://api.devnet.solana.com',
+  explorerTxUrl: 'https://explorer.solana.com/tx/',
+  explorerTxSuffix: '?cluster=devnet',
+};
+
+/** 按网络环境取 Solana 配置（默认取当前网络） */
+export function getSolNetworkConfig(network: NetworkType = getNetwork()): SolNetworkConfig {
+  return network === 'mainnet' ? SOL_MAINNET_CONFIG : SOL_TESTNET_CONFIG;
+}
 
 const LAMPORTS_PER_SOL_BI = 1_000_000_000n;
 /** 交易费预留（lamports），仅用于余额提示，不作为硬性校验 */
@@ -119,36 +146,53 @@ function solToLamports(amount: string): number {
   return Number(lamports);
 }
 
-let connection: Connection | null = null;
+/** 每个网络环境各自的懒加载 Connection */
+const connections = new Map<NetworkType, Connection>();
 
-/** 懒加载单例 Connection */
-function getConnection(): Connection {
+/** 懒加载单例 Connection（按网络环境缓存） */
+function getConnection(network: NetworkType = getNetwork()): Connection {
+  let connection = connections.get(network);
   if (!connection) {
-    connection = new Connection(SOL_RPC_URL, 'confirmed');
+    connection = new Connection(getSolNetworkConfig(network).rpcUrl, 'confirmed');
+    connections.set(network, connection);
   }
   return connection;
 }
 
+/** 切换网络环境后释放全部 Connection，下次使用会按新网络重新建立 */
+export function resetSolConnections(): void {
+  connections.clear();
+}
+
 /**
- * 查询主网上某个 Solana 地址的余额，返回以 SOL 为单位的数值。
+ * 查询某个 Solana 地址的余额，返回以 SOL 为单位的数值（默认查当前网络环境）。
  * 注意：返回值为 number，仅用于界面展示。
  */
-export async function fetchSolBalance(address: string): Promise<number> {
-  const lamports = await getConnection().getBalance(new PublicKey(address));
+export async function fetchSolBalance(
+  address: string,
+  network: NetworkType = getNetwork(),
+): Promise<number> {
+  const lamports = await getConnection(network).getBalance(new PublicKey(address));
   return lamports / LAMPORTS_PER_SOL;
 }
 
 /**
  * 发送 SOL：取最新 blockhash → 构造系统转账 → 签名 → 广播。返回交易签名（txid）。
+ * 主网与测试网地址/私钥相同，仅 RPC 节点不同。
  */
-export async function sendSol(secretKey: Uint8Array, to: string, amount: string): Promise<string> {
+export async function sendSol(
+  secretKey: Uint8Array,
+  to: string,
+  amount: string,
+  network: NetworkType = getNetwork(),
+): Promise<string> {
   const toAddress = to.trim();
   if (!isValidSolAddress(toAddress)) {
     throw new Error('无效的 Solana 收款地址');
   }
   const lamports = solToLamports(amount);
 
-  const connectionInstance = getConnection();
+  const connectionInstance = getConnection(network);
   const keypair = Keypair.fromSeed(secretKey);
   const fromPubkey = keypair.publicKey;
 

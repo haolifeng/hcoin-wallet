@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('walletAPI', {
+  getNetwork: () => ipcRenderer.invoke('wallet:getNetwork'),
+  setNetwork: (network: 'mainnet' | 'testnet') =>
+    ipcRenderer.invoke('wallet:setNetwork', network),
   getBalance: (address: string) =>
     ipcRenderer.invoke('wallet:getBalance', address),
   getChainBalances: (address: string) =>

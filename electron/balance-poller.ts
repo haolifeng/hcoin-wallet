@@ -1,13 +1,15 @@
-import {
-  SUPPORTED_CHAINS,
-  fetchNativeBalance,
-  fetchChainTokenBalance,
-} from './chains';
+import { getSupportedChains, fetchNativeBalance, fetchChainTokenBalance } from './chains';
 import { fetchBtcBalance } from './bitcoin';
 import { fetchSolBalance } from './solana';
-import { listAccounts, setChainNativeBalance, setChainTokenBalances } from './db';
+import {
+  listAccounts,
+  resolveBtcAddress,
+  setChainNativeBalance,
+  setChainTokenBalances,
+} from './db';
+import { getNetwork } from './network';
 
-/** 后台轮询间隔（毫秒）：15s 查一次各测试网并写库 */
+/** 后台轮询间隔（毫秒）：15s 查一次当前网络环境下的各链并写库 */
 const POLL_INTERVAL_MS = 15_000;
 
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -16,8 +18,9 @@ let polling = false;
 
 /**
  * 执行一轮轮询：遍历所有账户，逐条链查询余额并写入数据库，供渲染进程查询展示。
+ * 链配置、RPC 节点与 BTC 地址均按当前网络环境（主网 / 测试网）取值。
  * - EVM 链（ETH / AVAX）：用 EVM 通用地址查询原生代币与 ERC-20 余额
- * - BTC 链：用独立 BIP84 地址查询原生 BTC 余额
+ * - BTC 链：用该网络下的 BIP84 地址查询原生 BTC 余额
  * 缺少对应地址的链会跳过；单条链失败不影响其它。
  */
 export async function pollEthBalancesOnce(): Promise<void> {
@@ -25,12 +28,13 @@ export async function pollEthBalancesOnce(): Promise<void> {
   polling = true;
   try {
     const accounts = await listAccounts();
+    const chains = getSupportedChains();
     await Promise.all(
       accounts.map(async (account) => {
         await Promise.all(
-          SUPPORTED_CHAINS.map(async (chain) => {
+          chains.map(async (chain) => {
             if (chain.kind === 'bitcoin') {
-              const address = account.btcAddress;
+              const address = resolveBtcAddress(account);
               if (!address) return;
               try {
                 const balance = await fetchBtcBalance(address);
@@ -125,10 +129,11 @@ export async function pollEthBalancesOnce(): Promise<void> {
 /** 启动后台轮询（立即执行一次，之后按固定间隔执行） */
 export function startEthBalancePolling(): void {
   if (timer) return;
-  const summary = SUPPORTED_CHAINS.map(
-    (c) => `${c.nativeSymbol}/${c.tokens.map((t) => t.symbol).join('/')}（${c.name}）`,
-  ).join('、');
-  console.log(`[balance] 启动余额轮询：${summary}`);
+  const network = getNetwork();
+  const summary = getSupportedChains(network)
+    .map((c) => `${c.nativeSymbol}/${c.tokens.map((t) => t.symbol).join('/')}（${c.name}）`)
+    .join('、');
+  console.log(`[balance] 启动余额轮询（${network === 'mainnet' ? '主网' : '测试网'}）：${summary}`);
   void pollEthBalancesOnce();
   timer = setInterval(() => {
     void pollEthBalancesOnce();

@@ -1,25 +1,31 @@
 import { Alert, Button, Input, Modal, Result, Select, Typography, message } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { sendStore } from '../stores/SendStore';
-import { CHAINS, SEND_ASSET_OPTIONS, buildAssetValue } from '../constants/chains';
+import { networkStore } from '../stores/NetworkStore';
+import {
+  buildAssetValue,
+  buildExplorerTxUrl,
+  getSendAssetOptions,
+} from '../constants/chains';
 
 const { Text } = Typography;
 
-/** 发送 ETH / AVAX / BTC / USDT / USDC 弹窗（支持多链） */
+/** 发送 ETH / AVAX / BTC / USDT / USDC 弹窗（支持多链，按当前网络环境发送） */
 const SendModal = observer(() => {
   const store = sendStore;
 
-  const currentChain = CHAINS.find((c) => c.key === store.chain);
-  const explorerBase = currentChain?.explorerTxUrl ?? '';
+  const currentChain = store.currentChain;
   const isBtc = currentChain?.kind === 'bitcoin';
   const isSol = currentChain?.kind === 'solana';
-  const isMainnet = isBtc || isSol;
+  const isMainnet = networkStore.isMainnet;
 
   // 锁定时只保留当前选中的币种，用户无法切换到其它资产
   const selectedAssetValue = buildAssetValue(store.chain, store.asset);
   const assetOptions = store.lockAsset
-    ? SEND_ASSET_OPTIONS.filter((option) => option.value === selectedAssetValue)
-    : SEND_ASSET_OPTIONS;
+    ? getSendAssetOptions(networkStore.network).filter(
+        (option) => option.value === selectedAssetValue,
+      )
+    : getSendAssetOptions(networkStore.network);
 
   const handleSubmit = async () => {
     try {
@@ -75,10 +81,10 @@ const SendModal = observer(() => {
             </Text>
           }
         >
-          {explorerBase && (
+          {store.txHash && buildExplorerTxUrl(currentChain, store.txHash) && (
             <Button
               type="link"
-              href={`${explorerBase}${store.txHash}`}
+              href={buildExplorerTxUrl(currentChain, store.txHash)}
               target="_blank"
               rel="noreferrer"
             >
@@ -122,7 +128,9 @@ const SendModal = observer(() => {
             <Text strong>接收地址</Text>
             <Input
               value={store.to}
-              placeholder={isBtc ? 'bc1…' : isSol ? 'base58…' : '0x…'}
+              placeholder={
+                isBtc ? (networkStore.isMainnet ? 'bc1…' : 'tb1…') : isSol ? 'base58…' : '0x…'
+              }
               onChange={(e) => store.setTo(e.target.value)}
               style={{ marginTop: 4 }}
             />

@@ -143,6 +143,18 @@ class StartupStore {
     }
   }
 
+  /**
+   * 网络切换后更新当前账户信息：
+   * BTC 主网 / 测试网派生路径不同，地址需要换成新网络下的那个。
+   */
+  setAccount(account: UnlockResult): void {
+    runInAction(() => {
+      if (this.account) this.account = account;
+      this.chainBalances = {};
+      this.balanceLoading = true;
+    });
+  }
+
   /** 启动阶段完成创建：记录账户并放行进入主界面 */
   markCreated(result: UnlockResult): void {
     runInAction(() => {

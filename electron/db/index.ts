@@ -12,6 +12,7 @@ import { generateMnemonic as generateBip39Mnemonic, validateMnemonic } from 'bip
 import { deriveEthAccount } from '../chains';
 import { deriveBtcAccount } from '../bitcoin';
 import { deriveSolAccount } from '../solana';
+import { getNetwork, type NetworkType } from '../network';
 
 /** 助记词对称加密后的密文结构（只落盘密文，明文永不写入数据库） */
 export interface EncryptedSecret {
@@ -52,14 +53,27 @@ export interface Account {
   ethAddress?: string;
   /** 账户使用的 BIP44 派生路径 */
   ethPath?: string;
-  /** 由助记词派生的 BTC 主网地址（BIP84 Native SegWit），解锁/创建时写入 */
+  /** 由助记词派生的 BTC 主网地址（BIP84 coinType 0），解锁/创建时写入 */
   btcAddress?: string;
-  /** 账户使用的 BIP84 派生路径 */
+  /** BTC 主网使用的 BIP84 派生路径 */
   btcPath?: string;
-  /** 由助记词派生的 Solana 主网地址（SLIP-0010 Ed25519），解锁/创建时写入 */
+  /** 由助记词派生的 BTC 测试网地址（BIP84 coinType 1），解锁/创建时写入 */
+  btcTestnetAddress?: string;
+  /** BTC 测试网使用的 BIP84 派生路径 */
+  btcTestnetPath?: string;
+  /** 由助记词派生的 Solana 地址（SLIP-0010 Ed25519，主网/测试网一致），解锁/创建时写入 */
   solAddress?: string;
   /** 账户使用的 Solana 派生路径 */
   solPath?: string;
+}
+
+/** 取账户在指定网络环境下的 BTC 地址（缺失时回落到主网地址） */
+export function resolveBtcAddress(
+  account: Pick<Account, 'btcAddress' | 'btcTestnetAddress'>,
+  network: NetworkType = getNetwork(),
+): string | undefined {
+  if (network === 'testnet') return account.btcTestnetAddress ?? account.btcAddress;
+  return account.btcAddress;
 }
 
 /** 启动时检测结果：数据库里是否已经存在加密助记词 */
@@ -234,9 +248,11 @@ export async function createAccount(
   }
 
   const secret = encryptMnemonic(mnemonic, password);
-  // 助记词此刻仍是明文，趁此派生 ETH / BTC / SOL 账户；派生后不再持有明文引用
+  // 助记词此刻仍是明文，趁此派生 ETH / BTC / SOL 账户；派生后不再持有明文引用。
+  // BTC 主网与测试网的派生路径不同，两个地址都落库，切换网络时无需再次解密助记词
   const eth = deriveEthAccount(mnemonic);
-  const btc = deriveBtcAccount(mnemonic);
+  const btcMainnet = deriveBtcAccount(mnemonic, 'mainnet');
+  const btcTestnet = deriveBtcAccount(mnemonic, 'testnet');
   const sol = deriveSolAccount(mnemonic);
   await db.put(accountKey(address), {
     address,
@@ -246,8 +262,10 @@ export async function createAccount(
     secret,
     ethAddress: eth.address,
     ethPath: eth.path,
-    btcAddress: btc.address,
-    btcPath: btc.path,
+    btcAddress: btcMainnet.address,
+    btcPath: btcMainnet.path,
+    btcTestnetAddress: btcTestnet.address,
+    btcTestnetPath: btcTestnet.path,
     solAddress: sol.address,
     solPath: sol.path,
   });
@@ -255,7 +273,7 @@ export async function createAccount(
   return {
     address,
     ethAddress: eth.address,
-    btcAddress: btc.address,
+    btcAddress: getNetwork() === 'mainnet' ? btcMainnet.address : btcTestnet.address,
     solAddress: sol.address,
   };
 }
@@ -267,7 +285,10 @@ export async function listAccounts(): Promise<
     createdAt: number;
     hasSecret: boolean;
     ethAddress?: string;
+    /** BTC 主网地址 */
     btcAddress?: string;
+    /** BTC 测试网地址 */
+    btcTestnetAddress?: string;
     solAddress?: string;
   }[]
 > {
@@ -280,6 +301,7 @@ export async function listAccounts(): Promise<
     hasSecret: boolean;
     ethAddress?: string;
     btcAddress?: string;
+    btcTestnetAddress?: string;
     solAddress?: string;
   }[] = [];
   for await (const [key, account] of db.iterator()) {
@@ -290,6 +312,7 @@ export async function listAccounts(): Promise<
       hasSecret: Boolean(account.secret),
       ethAddress: account.ethAddress,
       btcAddress: account.btcAddress,
+      btcTestnetAddress: account.btcTestnetAddress,
       solAddress: account.solAddress,
     });
   }
@@ -352,11 +375,18 @@ export async function unlockAccountWithSigner(
     ethAddress = eth.address;
     updated = { ...updated, ethAddress, ethPath: eth.path };
   }
+  // BTC 主网 / 测试网派生路径不同，两个地址都要补齐（历史账户在首次解锁时补派生）
   let btcAddress = account.btcAddress;
   if (!btcAddress) {
-    const btc = deriveBtcAccount(mnemonic);
+    const btc = deriveBtcAccount(mnemonic, 'mainnet');
     btcAddress = btc.address;
     updated = { ...updated, btcAddress, btcPath: btc.path };
+  }
+  let btcTestnetAddress = account.btcTestnetAddress;
+  if (!btcTestnetAddress) {
+    const btc = deriveBtcAccount(mnemonic, 'testnet');
+    btcTestnetAddress = btc.address;
+    updated = { ...updated, btcTestnetAddress, btcTestnetPath: btc.path };
   }
   let solAddress = account.solAddress;
   if (!solAddress) {
@@ -368,7 +398,11 @@ export async function unlockAccountWithSigner(
     await db.put(accountKey(address), updated);
   }
 
-  return { result: { address, ethAddress, btcAddress, solAddress }, mnemonic };
+  // 回传当前网络环境下的 BTC 地址
+  const currentBtcAddress =
+    getNetwork() === 'mainnet' ? btcAddress : (btcTestnetAddress ?? btcAddress);
+
+  return { result: { address, ethAddress, btcAddress: currentBtcAddress, solAddress }, mnemonic };
 }
 
 /**
@@ -577,9 +611,16 @@ export async function querySectionData(section: string): Promise<SectionRow[]> {
     }
 
     case 'about': {
+      const mainnet = getNetwork() === 'mainnet';
       return [
         { key: 'name', item: '钱包名称', value: 'HCoinWallet' },
-        { key: 'net', item: '网络环境', value: '测试网 (Sepolia)' },
+        {
+          key: 'net',
+          item: '网络环境',
+          value: mainnet
+            ? '主网 (Ethereum / Avalanche / Bitcoin / Solana)'
+            : '测试网 (Sepolia / Fuji / Bitcoin Testnet / Solana Devnet)',
+        },
         { key: 'ver', item: '客户端版本', value: 'v0.0.1' },
         { key: 'db', item: '数据存储', value: 'LevelDB (classic-level)' },
       ];

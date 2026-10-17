@@ -7,6 +7,7 @@ const path = require("node:path");
 const classicLevel = require("classic-level");
 const require$$0$1 = require("node:crypto");
 const ethers = require("ethers");
+const fs = require("node:fs/promises");
 const web3_js = require("@solana/web3.js");
 var src = {};
 var sha256$3 = {};
@@ -21862,57 +21863,149 @@ function getDefaultWordlist() {
 src.getDefaultWordlist = getDefaultWordlist;
 var _wordlists_2 = _wordlists;
 src.wordlists = _wordlists_2.wordlists;
+const DEFAULT_NETWORK = "testnet";
+const NETWORK_FILE = "network.json";
+let currentNetwork = DEFAULT_NETWORK;
+function isNetworkType(value) {
+  return value === "mainnet" || value === "testnet";
+}
+function getNetwork() {
+  return currentNetwork;
+}
+function networkFilePath() {
+  return path.join(electron.app.getPath("userData"), NETWORK_FILE);
+}
+async function loadNetwork() {
+  try {
+    const raw = await fs.readFile(networkFilePath(), "utf8");
+    const parsed = JSON.parse(raw);
+    currentNetwork = isNetworkType(parsed.network) ? parsed.network : DEFAULT_NETWORK;
+  } catch {
+    currentNetwork = DEFAULT_NETWORK;
+  }
+  return currentNetwork;
+}
+async function setNetwork(network) {
+  if (!isNetworkType(network)) {
+    throw new Error(`不支持的网络环境：${String(network)}`);
+  }
+  currentNetwork = network;
+  try {
+    await fs.writeFile(networkFilePath(), JSON.stringify({ network }), "utf8");
+  } catch (err) {
+    console.error("[network] 持久化网络环境失败:", err);
+  }
+  return currentNetwork;
+}
 const ETH_DERIVE_PATH = "m/44'/60'/0'/0/0";
-const SUPPORTED_CHAINS = [
+const CHAIN_DEFS = [
   {
-    kind: "evm",
     key: "eth",
-    name: "Sepolia",
-    nativeSymbol: "ETH",
-    rpcUrl: process.env.ETH_TESTNET_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com",
-    explorerTxUrl: "https://sepolia.etherscan.io/tx/",
-    tokens: [
-      { symbol: "USDT", address: "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0", decimals: 6 },
-      { symbol: "USDC", address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", decimals: 6 }
-    ]
-  },
-  {
     kind: "evm",
+    nativeSymbol: "ETH",
+    networks: {
+      mainnet: {
+        name: "Ethereum",
+        rpcUrl: process.env.ETH_MAINNET_RPC_URL ?? "https://ethereum-rpc.publicnode.com",
+        explorerTxUrl: "https://etherscan.io/tx/",
+        tokens: [
+          { symbol: "USDT", address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6 },
+          { symbol: "USDC", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6 }
+        ]
+      },
+      testnet: {
+        name: "Sepolia",
+        rpcUrl: process.env.ETH_TESTNET_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com",
+        explorerTxUrl: "https://sepolia.etherscan.io/tx/",
+        tokens: [
+          { symbol: "USDT", address: "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0", decimals: 6 },
+          { symbol: "USDC", address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", decimals: 6 }
+        ]
+      }
+    }
+  },
+  {
     key: "avax",
-    name: "Fuji",
+    kind: "evm",
     nativeSymbol: "AVAX",
-    rpcUrl: process.env.AVAX_TESTNET_RPC_URL ?? "https://api.avax-test.network/ext/bc/C/rpc",
-    explorerTxUrl: "https://testnet.snowtrace.io/tx/",
-    tokens: [
-      { symbol: "USDT", address: "0xAb231A5744C8E6c45481754928cCfFFFD4aa0732", decimals: 6 },
-      { symbol: "USDC", address: "0x5425890298aed601595a70AB815c96711a31Bc65", decimals: 6 }
-    ]
+    networks: {
+      mainnet: {
+        name: "Avalanche",
+        rpcUrl: process.env.AVAX_MAINNET_RPC_URL ?? "https://avalanche-c-chain-rpc.publicnode.com",
+        explorerTxUrl: "https://snowtrace.io/tx/",
+        tokens: [
+          { symbol: "USDT", address: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7", decimals: 6 },
+          { symbol: "USDC", address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E", decimals: 6 }
+        ]
+      },
+      testnet: {
+        name: "Fuji",
+        rpcUrl: process.env.AVAX_TESTNET_RPC_URL ?? "https://api.avax-test.network/ext/bc/C/rpc",
+        explorerTxUrl: "https://testnet.snowtrace.io/tx/",
+        tokens: [
+          { symbol: "USDT", address: "0xAb231A5744C8E6c45481754928cCfFFFD4aa0732", decimals: 6 },
+          { symbol: "USDC", address: "0x5425890298aed601595a70AB815c96711a31Bc65", decimals: 6 }
+        ]
+      }
+    }
   },
   {
-    kind: "bitcoin",
     key: "btc",
-    name: "Bitcoin",
+    kind: "bitcoin",
     nativeSymbol: "BTC",
-    explorerTxUrl: "https://mempool.space/tx/",
-    tokens: []
+    networks: {
+      mainnet: { name: "Bitcoin", explorerTxUrl: "https://mempool.space/tx/", tokens: [] },
+      testnet: {
+        name: "Bitcoin Testnet",
+        explorerTxUrl: "https://mempool.space/testnet/tx/",
+        tokens: []
+      }
+    }
   },
   {
-    kind: "solana",
     key: "sol",
-    name: "Solana",
+    kind: "solana",
     nativeSymbol: "SOL",
-    explorerTxUrl: "https://explorer.solana.com/tx/",
-    tokens: []
+    networks: {
+      mainnet: { name: "Solana", explorerTxUrl: "https://explorer.solana.com/tx/", tokens: [] },
+      testnet: {
+        name: "Solana Devnet",
+        explorerTxUrl: "https://explorer.solana.com/tx/",
+        explorerTxSuffix: "?cluster=devnet",
+        tokens: []
+      }
+    }
   }
 ];
-const providers = /* @__PURE__ */ new Map();
-function getChain(chainKey) {
-  const chain2 = SUPPORTED_CHAINS.find((c) => c.key === chainKey);
+function buildChainConfig(def2, network) {
+  const base = {
+    key: def2.key,
+    nativeSymbol: def2.nativeSymbol,
+    name: def2.networks[network].name,
+    explorerTxUrl: def2.networks[network].explorerTxUrl,
+    explorerTxSuffix: def2.networks[network].explorerTxSuffix
+  };
+  switch (def2.kind) {
+    case "evm": {
+      const net = def2.networks[network];
+      return { ...base, kind: "evm", rpcUrl: net.rpcUrl, tokens: net.tokens };
+    }
+    case "bitcoin":
+      return { ...base, kind: "bitcoin", tokens: [] };
+    case "solana":
+      return { ...base, kind: "solana", tokens: [] };
+  }
+}
+function getSupportedChains(network = getNetwork()) {
+  return CHAIN_DEFS.map((def2) => buildChainConfig(def2, network));
+}
+function getChain(chainKey, network = getNetwork()) {
+  const chain2 = getSupportedChains(network).find((c) => c.key === chainKey);
   if (!chain2) throw new Error(`不支持的链：${chainKey}`);
   return chain2;
 }
-function getEvmChain(chainKey) {
-  const chain2 = getChain(chainKey);
+function getEvmChain(chainKey, network = getNetwork()) {
+  const chain2 = getChain(chainKey, network);
   if (chain2.kind !== "evm") throw new Error(`链 ${chain2.name} 不是 EVM 链`);
   return chain2;
 }
@@ -21921,13 +22014,21 @@ function getToken(chain2, symbol) {
   if (!token) throw new Error(`链 ${chain2.name} 不支持代币：${symbol}`);
   return token;
 }
-function getProvider(chain2) {
-  let provider = providers.get(chain2.key);
+const providers = /* @__PURE__ */ new Map();
+function getProvider(chain2, network = getNetwork()) {
+  const cacheKey = `${network}:${chain2.key}`;
+  let provider = providers.get(cacheKey);
   if (!provider) {
     provider = new ethers.JsonRpcProvider(chain2.rpcUrl, void 0, { staticNetwork: true });
-    providers.set(chain2.key, provider);
+    providers.set(cacheKey, provider);
   }
   return provider;
+}
+function resetChainProviders() {
+  for (const provider of providers.values()) {
+    provider.destroy();
+  }
+  providers.clear();
 }
 const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -30079,6 +30180,12 @@ const NETWORK = /* @__PURE__ */ Object.freeze({
   scriptHash: 5,
   wif: 128
 });
+const TEST_NETWORK = /* @__PURE__ */ Object.freeze({
+  bech32: "tb",
+  pubKeyHash: 111,
+  scriptHash: 196,
+  wif: 239
+});
 function compareBytes(a, b) {
   if (!isBytes(a) || !isBytes(b))
     throw new TypeError(`cmp: wrong type a=${typeof a} b=${typeof b}`);
@@ -33027,30 +33134,51 @@ class Transaction {
     return Transaction.fromPSBT(this.toPSBT(), this.opts);
   }
 }
-const BTC_DERIVE_PATH = "m/84'/0'/0'/0/0";
-const BTC_API_BASE = process.env.BTC_API_BASE_URL ?? "https://mempool.space/api";
+const BTC_MAINNET_DERIVE_PATH = "m/84'/0'/0'/0/0";
+const BTC_TESTNET_DERIVE_PATH = "m/84'/1'/0'/0/0";
+const BTC_MAINNET_API_BASE = process.env.BTC_API_BASE_URL ?? "https://mempool.space/api";
+const BTC_TESTNET_API_BASE = process.env.BTC_TESTNET_API_BASE_URL ?? "https://mempool.space/testnet/api";
+const BTC_MAINNET_CONFIG = {
+  name: "Bitcoin",
+  path: BTC_MAINNET_DERIVE_PATH,
+  network: NETWORK,
+  apiBase: BTC_MAINNET_API_BASE,
+  explorerTxUrl: "https://mempool.space/tx/"
+};
+const BTC_TESTNET_CONFIG = {
+  name: "Bitcoin Testnet",
+  path: BTC_TESTNET_DERIVE_PATH,
+  network: TEST_NETWORK,
+  apiBase: BTC_TESTNET_API_BASE,
+  explorerTxUrl: "https://mempool.space/testnet/tx/"
+};
+function getBtcNetworkConfig(network = getNetwork()) {
+  return network === "mainnet" ? BTC_MAINNET_CONFIG : BTC_TESTNET_CONFIG;
+}
 const DUST_LIMIT = 546n;
 const SATS_PER_BTC = 100000000n;
-function deriveBtcAccount(mnemonic) {
+function deriveBtcAccount(mnemonic, network = getNetwork()) {
+  const config = getBtcNetworkConfig(network);
   const seed = mnemonicToSeedSync_1(mnemonic.trim().toLowerCase());
-  const child = HDKey.fromMasterSeed(seed).derive(BTC_DERIVE_PATH);
+  const child = HDKey.fromMasterSeed(seed).derive(config.path);
   if (!child.publicKey || !child.privateKey) {
     throw new Error("BTC 账户派生失败");
   }
-  const payment = p2wpkh(child.publicKey, NETWORK);
+  const payment = p2wpkh(child.publicKey, config.network);
   if (!payment.address) {
     throw new Error("BTC 地址生成失败");
   }
   return {
     address: payment.address,
-    path: BTC_DERIVE_PATH,
+    path: config.path,
+    network,
     publicKey: child.publicKey,
     privateKey: child.privateKey
   };
 }
-function isValidBtcAddress(address) {
+function isValidBtcAddress(address, network = getNetwork()) {
   try {
-    Address(NETWORK).decode(address);
+    Address(getBtcNetworkConfig(network).network).decode(address);
     return true;
   } catch {
     return false;
@@ -33068,35 +33196,37 @@ function btcToSats(amount) {
 function satsToBtc(sats) {
   return Number(sats) / Number(SATS_PER_BTC);
 }
-async function apiGet(path2) {
-  const res = await fetch(`${BTC_API_BASE}${path2}`);
+async function apiGet(apiBase, path2) {
+  const res = await fetch(`${apiBase}${path2}`);
   if (!res.ok) {
     throw new Error(`BTC API 请求失败：${res.status} ${res.statusText}`);
   }
   return await res.json();
 }
-async function fetchBtcBalance(address) {
-  const stats = await apiGet(`/address/${address}`);
+async function fetchBtcBalance(address, network = getNetwork()) {
+  const { apiBase } = getBtcNetworkConfig(network);
+  const stats = await apiGet(apiBase, `/address/${address}`);
   const chain2 = stats.chain_stats.funded_txo_sum - stats.chain_stats.spent_txo_sum;
   const mempool = stats.mempool_stats.funded_txo_sum - stats.mempool_stats.spent_txo_sum;
   return satsToBtc(BigInt(chain2 + mempool));
 }
-async function fetchFeeRate() {
-  const fees = await apiGet("/v1/fees/recommended");
+async function fetchFeeRate(apiBase) {
+  const fees = await apiGet(apiBase, "/v1/fees/recommended");
   return Math.max(1, fees.halfHourFee || fees.fastestFee || 1);
 }
-async function sendBtc(account, to, amount) {
+async function sendBtc(account, to, amount, network = account.network) {
+  const config = getBtcNetworkConfig(network);
   const toAddress = to.trim();
-  if (!isValidBtcAddress(toAddress)) {
+  if (!isValidBtcAddress(toAddress, network)) {
     throw new Error("无效的 BTC 收款地址");
   }
   const sendSats = btcToSats(amount);
   if (sendSats <= 0n) {
     throw new Error("请输入有效的发送数量");
   }
-  const payment = p2wpkh(account.publicKey, NETWORK);
-  const feeRate = await fetchFeeRate();
-  const rawUtxos = await apiGet(`/address/${account.address}/utxo`);
+  const payment = p2wpkh(account.publicKey, config.network);
+  const feeRate = await fetchFeeRate(config.apiBase);
+  const rawUtxos = await apiGet(config.apiBase, `/address/${account.address}/utxo`);
   if (rawUtxos.length === 0) {
     throw new Error("可用余额为 0，无法发送");
   }
@@ -33123,13 +33253,13 @@ async function sendBtc(account, to, amount) {
       witnessUtxo: { script: payment.script, amount: utxo.value }
     });
   }
-  tx.addOutputAddress(toAddress, sendSats, NETWORK);
+  tx.addOutputAddress(toAddress, sendSats, config.network);
   if (change > DUST_LIMIT) {
-    tx.addOutputAddress(account.address, change, NETWORK);
+    tx.addOutputAddress(account.address, change, config.network);
   }
   tx.sign(account.privateKey);
   tx.finalize();
-  const res = await fetch(`${BTC_API_BASE}/tx`, {
+  const res = await fetch(`${config.apiBase}/tx`, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: tx.hex
@@ -33142,7 +33272,20 @@ async function sendBtc(account, to, amount) {
   return txid || tx.id;
 }
 const SOL_DERIVE_PATH = "m/44'/501'/0'/0'";
-const SOL_RPC_URL = process.env.SOL_RPC_URL ?? "https://solana-rpc.publicnode.com";
+const SOL_MAINNET_CONFIG = {
+  name: "Solana",
+  rpcUrl: process.env.SOL_RPC_URL ?? "https://solana-rpc.publicnode.com",
+  explorerTxUrl: "https://explorer.solana.com/tx/"
+};
+const SOL_TESTNET_CONFIG = {
+  name: "Solana Devnet",
+  rpcUrl: process.env.SOL_DEVNET_RPC_URL ?? "https://api.devnet.solana.com",
+  explorerTxUrl: "https://explorer.solana.com/tx/",
+  explorerTxSuffix: "?cluster=devnet"
+};
+function getSolNetworkConfig(network = getNetwork()) {
+  return network === "mainnet" ? SOL_MAINNET_CONFIG : SOL_TESTNET_CONFIG;
+}
 const LAMPORTS_PER_SOL_BI = 1000000000n;
 const HARDENED = 2147483648;
 function slip10Ed25519(seed, indices) {
@@ -33208,24 +33351,29 @@ function solToLamports(amount) {
   }
   return Number(lamports);
 }
-let connection = null;
-function getConnection() {
+const connections = /* @__PURE__ */ new Map();
+function getConnection(network = getNetwork()) {
+  let connection = connections.get(network);
   if (!connection) {
-    connection = new web3_js.Connection(SOL_RPC_URL, "confirmed");
+    connection = new web3_js.Connection(getSolNetworkConfig(network).rpcUrl, "confirmed");
+    connections.set(network, connection);
   }
   return connection;
 }
-async function fetchSolBalance(address) {
-  const lamports = await getConnection().getBalance(new web3_js.PublicKey(address));
+function resetSolConnections() {
+  connections.clear();
+}
+async function fetchSolBalance(address, network = getNetwork()) {
+  const lamports = await getConnection(network).getBalance(new web3_js.PublicKey(address));
   return lamports / web3_js.LAMPORTS_PER_SOL;
 }
-async function sendSol(secretKey, to, amount) {
+async function sendSol(secretKey, to, amount, network = getNetwork()) {
   const toAddress = to.trim();
   if (!isValidSolAddress(toAddress)) {
     throw new Error("无效的 Solana 收款地址");
   }
   const lamports = solToLamports(amount);
-  const connectionInstance = getConnection();
+  const connectionInstance = getConnection(network);
   const keypair = web3_js.Keypair.fromSeed(secretKey);
   const fromPubkey = keypair.publicKey;
   const balance = await connectionInstance.getBalance(fromPubkey);
@@ -33251,6 +33399,10 @@ async function sendSol(secretKey, to, amount) {
 }
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
 const KEY_LENGTH = 32;
+function resolveBtcAddress(account, network = getNetwork()) {
+  if (network === "testnet") return account.btcTestnetAddress ?? account.btcAddress;
+  return account.btcAddress;
+}
 let db;
 const accountKey = (address) => `account:${address}`;
 async function initDatabase() {
@@ -33353,7 +33505,8 @@ async function createAccount(mnemonic, password) {
   }
   const secret = encryptMnemonic(mnemonic, password);
   const eth = deriveEthAccount(mnemonic);
-  const btc = deriveBtcAccount(mnemonic);
+  const btcMainnet = deriveBtcAccount(mnemonic, "mainnet");
+  const btcTestnet = deriveBtcAccount(mnemonic, "testnet");
   const sol = deriveSolAccount(mnemonic);
   await db.put(accountKey(address), {
     address,
@@ -33363,15 +33516,17 @@ async function createAccount(mnemonic, password) {
     secret,
     ethAddress: eth.address,
     ethPath: eth.path,
-    btcAddress: btc.address,
-    btcPath: btc.path,
+    btcAddress: btcMainnet.address,
+    btcPath: btcMainnet.path,
+    btcTestnetAddress: btcTestnet.address,
+    btcTestnetPath: btcTestnet.path,
     solAddress: sol.address,
     solPath: sol.path
   });
   return {
     address,
     ethAddress: eth.address,
-    btcAddress: btc.address,
+    btcAddress: getNetwork() === "mainnet" ? btcMainnet.address : btcTestnet.address,
     solAddress: sol.address
   };
 }
@@ -33388,6 +33543,7 @@ async function listAccounts() {
       hasSecret: Boolean(account.secret),
       ethAddress: account.ethAddress,
       btcAddress: account.btcAddress,
+      btcTestnetAddress: account.btcTestnetAddress,
       solAddress: account.solAddress
     });
   }
@@ -33428,9 +33584,15 @@ async function unlockAccountWithSigner(address, password) {
   }
   let btcAddress = account.btcAddress;
   if (!btcAddress) {
-    const btc = deriveBtcAccount(mnemonic);
+    const btc = deriveBtcAccount(mnemonic, "mainnet");
     btcAddress = btc.address;
     updated = { ...updated, btcAddress, btcPath: btc.path };
+  }
+  let btcTestnetAddress = account.btcTestnetAddress;
+  if (!btcTestnetAddress) {
+    const btc = deriveBtcAccount(mnemonic, "testnet");
+    btcTestnetAddress = btc.address;
+    updated = { ...updated, btcTestnetAddress, btcTestnetPath: btc.path };
   }
   let solAddress = account.solAddress;
   if (!solAddress) {
@@ -33441,7 +33603,8 @@ async function unlockAccountWithSigner(address, password) {
   if (updated !== account) {
     await db.put(accountKey(address), updated);
   }
-  return { result: { address, ethAddress, btcAddress, solAddress }, mnemonic };
+  const currentBtcAddress = getNetwork() === "mainnet" ? btcAddress : btcTestnetAddress ?? btcAddress;
+  return { result: { address, ethAddress, btcAddress: currentBtcAddress, solAddress }, mnemonic };
 }
 async function decryptMnemonic(address, password) {
   if (!db || db.status !== "open") {
@@ -33586,9 +33749,14 @@ async function querySectionData(section) {
       return rows;
     }
     case "about": {
+      const mainnet = getNetwork() === "mainnet";
       return [
         { key: "name", item: "钱包名称", value: "HCoinWallet" },
-        { key: "net", item: "网络环境", value: "测试网 (Sepolia)" },
+        {
+          key: "net",
+          item: "网络环境",
+          value: mainnet ? "主网 (Ethereum / Avalanche / Bitcoin / Solana)" : "测试网 (Sepolia / Fuji / Bitcoin Testnet / Solana Devnet)"
+        },
         { key: "ver", item: "客户端版本", value: "v0.0.1" },
         { key: "db", item: "数据存储", value: "LevelDB (classic-level)" }
       ];
@@ -33605,12 +33773,13 @@ async function pollEthBalancesOnce() {
   polling = true;
   try {
     const accounts = await listAccounts();
+    const chains = getSupportedChains();
     await Promise.all(
       accounts.map(async (account) => {
         await Promise.all(
-          SUPPORTED_CHAINS.map(async (chain2) => {
+          chains.map(async (chain2) => {
             if (chain2.kind === "bitcoin") {
-              const address2 = account.btcAddress;
+              const address2 = resolveBtcAddress(account);
               if (!address2) return;
               try {
                 const balance = await fetchBtcBalance(address2);
@@ -33695,10 +33864,9 @@ async function pollEthBalancesOnce() {
 }
 function startEthBalancePolling() {
   if (timer) return;
-  const summary = SUPPORTED_CHAINS.map(
-    (c) => `${c.nativeSymbol}/${c.tokens.map((t) => t.symbol).join("/")}（${c.name}）`
-  ).join("、");
-  console.log(`[balance] 启动余额轮询：${summary}`);
+  const network = getNetwork();
+  const summary = getSupportedChains(network).map((c) => `${c.nativeSymbol}/${c.tokens.map((t) => t.symbol).join("/")}（${c.name}）`).join("、");
+  console.log(`[balance] 启动余额轮询（${network === "mainnet" ? "主网" : "测试网"}）：${summary}`);
   void pollEthBalancesOnce();
   timer = setInterval(() => {
     void pollEthBalancesOnce();
@@ -33716,6 +33884,9 @@ function setActiveWallet(address, wallet, btc, sol) {
 }
 function getActiveWallet() {
   return activeWallet;
+}
+function getActiveBtcAccount() {
+  return activeWallet ? activeWallet.btc[getNetwork()] : null;
 }
 function clearActiveWallet() {
   activeWallet = null;
@@ -33750,8 +33921,29 @@ electron.app.whenReady().then(async () => {
   } catch (err) {
     console.error("[main] 数据库初始化失败，应用将以只读/无数据方式继续运行:", err);
   }
+  const network = await loadNetwork();
+  console.log(`[main] 当前网络环境：${network === "mainnet" ? "主网" : "测试网"}`);
   createWindow();
   startEthBalancePolling();
+  electron.ipcMain.handle("wallet:getNetwork", () => {
+    return getNetwork();
+  });
+  electron.ipcMain.handle("wallet:setNetwork", async (_event, next) => {
+    const applied = await setNetwork(next);
+    resetChainProviders();
+    resetSolConnections();
+    void pollEthBalancesOnce();
+    const active = getActiveWallet();
+    if (!active) return { network: applied, account: null };
+    const btc = getActiveBtcAccount();
+    const account = {
+      address: active.address,
+      ethAddress: active.wallet.address,
+      btcAddress: (btc == null ? void 0 : btc.address) ?? "",
+      solAddress: active.sol.address
+    };
+    return { network: applied, account };
+  });
   electron.ipcMain.handle("wallet:getBalance", (_event, address) => {
     return queryBalance(address);
   });
@@ -33772,7 +33964,7 @@ electron.app.whenReady().then(async () => {
     setActiveWallet(
       result.address,
       deriveWallet(mnemonic),
-      deriveBtcAccount(mnemonic),
+      { mainnet: deriveBtcAccount(mnemonic, "mainnet"), testnet: deriveBtcAccount(mnemonic, "testnet") },
       deriveSolAccount(mnemonic)
     );
     void pollEthBalancesOnce();
@@ -33792,7 +33984,7 @@ electron.app.whenReady().then(async () => {
     setActiveWallet(
       result.address,
       deriveWallet(mnemonic),
-      deriveBtcAccount(mnemonic),
+      { mainnet: deriveBtcAccount(mnemonic, "mainnet"), testnet: deriveBtcAccount(mnemonic, "testnet") },
       deriveSolAccount(mnemonic)
     );
     return result;
@@ -33811,7 +34003,9 @@ electron.app.whenReady().then(async () => {
       if (asset !== chain2.nativeSymbol) {
         throw new Error(`链 ${chain2.name} 不支持资产：${asset}`);
       }
-      txHash = await sendBtc(active.btc, to.trim(), String(amount).trim());
+      const btc = getActiveBtcAccount();
+      if (!btc) throw new Error("钱包未解锁，无法发送");
+      txHash = await sendBtc(btc, to.trim(), String(amount).trim());
     } else if (chain2.kind === "solana") {
       if (asset !== chain2.nativeSymbol) {
         throw new Error(`链 ${chain2.name} 不支持资产：${asset}`);

@@ -1,3 +1,12 @@
+/** 网络环境：主网 / 测试网 */
+export type NetworkType = 'mainnet' | 'testnet';
+
+/** 切换网络环境的返回：新网络 + 当前会话在该网络下的账户地址（未解锁时为 null） */
+export interface SetNetworkResult {
+  network: NetworkType;
+  account: UnlockResult | null;
+}
+
 export interface SectionRow {
   key: string;
   [column: string]: string | number;
@@ -45,6 +54,8 @@ export interface SendParams {
 declare global {
   interface Window {
     walletAPI?: {
+      getNetwork: () => Promise<NetworkType>;
+      setNetwork: (network: NetworkType) => Promise<SetNetworkResult>;
       getBalance: (address: string) => Promise<number>;
       getChainBalances: (address: string) => Promise<ChainBalances>;
       getSectionData: (section: string) => Promise<SectionRow[]>;
@@ -61,6 +72,7 @@ declare global {
           hasSecret: boolean;
           ethAddress?: string;
           btcAddress?: string;
+          btcTestnetAddress?: string;
           solAddress?: string;
         }[]
       >;

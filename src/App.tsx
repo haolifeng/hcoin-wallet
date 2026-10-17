@@ -15,6 +15,7 @@ import ImportWalletModal from './components/ImportWalletModal';
 import SendModal from './components/SendModal';
 import { startupStore } from './stores/StartupStore';
 import { priceStore } from './stores/PriceStore';
+import { networkStore } from './stores/NetworkStore';
 
 const { Header: AHeader, Content, Footer: AFooter, Sider } = Layout;
 
@@ -25,6 +26,11 @@ export default function App() {
   // 启动流程：检测助记词 → 创建 / 解锁
   useEffect(() => {
     void startupStore.init();
+  }, []);
+
+  // 同步主进程持久化的网络环境（主网 / 测试网）
+  useEffect(() => {
+    void networkStore.init();
   }, []);
 
   // 全局拉取币种价格（总览 / 单链视图共用）
