@@ -15,10 +15,23 @@ export interface UnlockResult {
   ethAddress: string;
 }
 
+/** 可发送的资产类型 */
+export type SendAsset = 'ETH' | 'USDT' | 'USDC';
+
+/** 发送交易参数 */
+export interface SendParams {
+  address: string;
+  asset: SendAsset;
+  to: string;
+  amount: string;
+}
+
 declare global {
   interface Window {
     walletAPI?: {
       getBalance: (address: string) => Promise<number>;
+      getEthBalance: (address: string) => Promise<number>;
+      getTokenBalances: (address: string) => Promise<Record<string, number>>;
       getSectionData: (section: string) => Promise<SectionRow[]>;
       generateMnemonic: () => Promise<string>;
       validateMnemonic: (mnemonic: string) => Promise<boolean>;
@@ -32,6 +45,7 @@ declare global {
       backupMnemonic: (address: string, password: string) => Promise<string>;
       hasMnemonic: () => Promise<MnemonicState>;
       unlockWallet: (address: string, password: string) => Promise<UnlockResult>;
+      send: (params: SendParams) => Promise<string>;
     };
   }
 }

@@ -1,13 +1,23 @@
 import { Avatar, Button, Space, Typography } from 'antd';
+import { observer } from 'mobx-react-lite';
 import { settingsStore } from '../stores/SettingsStore';
+import { startupStore } from '../stores/StartupStore';
 
 const { Text } = Typography;
 
+/** 地址格式化：前 4 位 + 3 个点 + 后 4 位（如 0xAb...12Cd） */
+function formatAddress(address: string): string {
+  if (address.length <= 11) return address;
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
 /**
- * Header 内部内容：左（Logo）/ 中（导航）/ 右（用户区）。
+ * Header 内部内容：左（Logo）/ 右（用户区）。
  * 高度由外层 Layout.Header 固定为 60px，这里只负责横向分布。
  */
-export default function Header() {
+const Header = observer(() => {
+  const address = startupStore.account?.address;
+
   return (
     <div
       style={{
@@ -25,22 +35,18 @@ export default function Header() {
         </Text>
       </div>
 
-      {/* 中：导航 */}
-      <nav style={{ display: 'flex', gap: 24 }}>
-        <a style={{ color: 'rgba(255,255,255,0.85)' }} href="#dashboard">总揽</a>
-        <a style={{ color: 'rgba(255,255,255,0.85)' }} href="#accounts">账户</a>
-        <a style={{ color: 'rgba(255,255,255,0.85)' }} href="#balance">余额</a>
-        <a style={{ color: 'rgba(255,255,255,0.85)' }} href="#about">关于</a>
-      </nav>
-
-      {/* 右：用户区 */}
+      {/* 右：用户区（数据库账户地址替代原 Admin） */}
       <Space size={8} style={{ flexShrink: 0 }}>
         <Button size="small" onClick={() => settingsStore.openSettings()}>
           设置
         </Button>
         <Avatar size="small" style={{ backgroundColor: '#1677ff' }}>H</Avatar>
-        <Text style={{ color: 'rgba(255,255,255,0.85)' }}>Admin</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.85)' }}>
+          {address ? formatAddress(address) : '未登录'}
+        </Text>
       </Space>
     </div>
   );
-}
+});
+
+export default Header;

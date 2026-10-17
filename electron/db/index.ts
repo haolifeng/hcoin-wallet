@@ -31,6 +31,10 @@ export interface Account {
   address: string;
   balance: number;
   createdAt: number;
+  /** ETH 账户余额（单位 ETH），由主进程同步写入，前台轮询读取展示 */
+  ethBalance?: number;
+  /** 各 ERC-20 代币余额（symbol → 数值），由主进程轮询测试网后写入 */
+  tokenBalances?: Record<string, number>;
   secret?: EncryptedSecret;
   /** 由助记词派生的 ETH 账户地址，解锁/创建时写入，便于界面直接展示 */
   ethAddress?: string;
@@ -83,14 +87,11 @@ export async function initDatabase(): Promise<void> {
     throw err;
   }
 
-  // 插入演示数据（幂等）
-  const demoAddress = 'HC0xDEMO0001';
-  if (!(await db.has(accountKey(demoAddress)))) {
-    await db.put(accountKey(demoAddress), {
-      address: demoAddress,
-      balance: 1234.56,
-      createdAt: Date.now(),
-    });
+  // 不再写入任何演示数据：数据库为空时由启动流程弹出「创建 / 导入助记词」向导。
+  // 顺带清理历史版本遗留的演示账户，保证老用户升级后空库也能正常走启动向导。
+  const legacyDemoAddress = 'HC0xDEMO0001';
+  if (await db.has(accountKey(legacyDemoAddress))) {
+    await db.del(accountKey(legacyDemoAddress));
   }
 }
 
@@ -161,6 +162,8 @@ export async function createAccount(
     address,
     balance: 0,
     createdAt: Date.now(),
+    ethBalance: 0,
+    tokenBalances: {},
     secret,
     ethAddress: eth.address,
     ethPath: eth.path,
@@ -213,11 +216,22 @@ export async function hasMnemonic(): Promise<MnemonicState> {
   return { exists: Boolean(first), address: first?.address ?? null };
 }
 
+/** 解锁会话：除回传渲染进程的结果外，附带明文助记词（仅供主进程内存使用） */
+export interface UnlockSession {
+  result: UnlockResult;
+  /** 明文助记词——仅限主进程用于派生签名钱包，绝不回传渲染进程 */
+  mnemonic: string;
+}
+
 /**
  * 解锁钱包：用密码解密助记词 → 派生 ETH 账户 → 持久化 ETH 地址。
- * 明文助记词只在本次调用内存在，不会回传渲染进程；密码错误由 decryptMnemonic 抛出。
+ * 明文助记词随返回值交予主进程建立签名会话，不会写入数据库或回传渲染进程；
+ * 密码错误由 decryptMnemonic 抛出。
  */
-export async function unlockAccount(address: string, password: string): Promise<UnlockResult> {
+export async function unlockAccountWithSigner(
+  address: string,
+  password: string,
+): Promise<UnlockSession> {
   if (!db || db.status !== 'open') {
     throw new Error('数据库尚未就绪，无法解锁账户');
   }
@@ -239,7 +253,14 @@ export async function unlockAccount(address: string, password: string): Promise<
     await db.put(accountKey(address), { ...account, ethAddress, ethPath: eth.path });
   }
 
-  return { address, ethAddress };
+  return { result: { address, ethAddress }, mnemonic };
+}
+
+/**
+ * 解锁钱包（只返回可回传渲染进程的地址信息）。
+ */
+export async function unlockAccount(address: string, password: string): Promise<UnlockResult> {
+  return (await unlockAccountWithSigner(address, password)).result;
 }
 
 /**
@@ -299,6 +320,79 @@ export async function queryBalance(address: string): Promise<number> {
   }
     throw err;
 }
+}
+
+/**
+ * 按钱包账户地址查询 ETH 余额（供前台轮询展示）。
+ * 账户不存在或数据库未就绪时返回 0。
+ */
+export async function queryEthBalance(address: string): Promise<number> {
+  if (!db || db.status !== 'open') {
+    console.warn('[db] queryEthBalance 调用时数据库尚未就绪');
+    return 0;
+  }
+  try {
+    const account = await db.get(accountKey(address));
+    return account?.ethBalance ?? 0;
+  } catch (err: unknown) {
+    // classic-level 在 key 不存在时抛出 LEVEL_NOT_FOUND
+    if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: string }).code === 'LEVEL_NOT_FOUND'
+    ) {
+      return 0;
+    }
+    throw err;
+  }
+}
+
+/**
+ * 更新账户的 ETH 余额（后台轮询测试网后写入数据库）。
+ * 账户不存在或数据库未就绪时静默跳过。
+ */
+export async function setEthBalance(address: string, ethBalance: number): Promise<void> {
+  if (!db || db.status !== 'open') {
+    console.warn('[db] setEthBalance 调用时数据库尚未就绪');
+    return;
+  }
+  const account = await db.get(accountKey(address)).catch(() => null);
+  if (!account) return;
+  await db.put(accountKey(address), { ...account, ethBalance });
+}
+
+/**
+ * 合并更新账户的 ERC-20 代币余额（后台轮询测试网后写入数据库）。
+ * 账户不存在或数据库未就绪时静默跳过。
+ */
+export async function setTokenBalances(
+  address: string,
+  balances: Record<string, number>,
+): Promise<void> {
+  if (!db || db.status !== 'open') {
+    console.warn('[db] setTokenBalances 调用时数据库尚未就绪');
+    return;
+  }
+  const account = await db.get(accountKey(address)).catch(() => null);
+  if (!account) return;
+  await db.put(accountKey(address), {
+    ...account,
+    tokenBalances: { ...(account.tokenBalances ?? {}), ...balances },
+  });
+}
+
+/**
+ * 按钱包账户地址查询该账户的所有 ERC-20 代币余额（symbol → 数值）。
+ * 账户不存在或数据库未就绪时返回空对象。
+ */
+export async function queryTokenBalances(address: string): Promise<Record<string, number>> {
+  if (!db || db.status !== 'open') {
+    console.warn('[db] queryTokenBalances 调用时数据库尚未就绪');
+    return {};
+  }
+  const account = await db.get(accountKey(address)).catch(() => null);
+  return account?.tokenBalances ?? {};
 }
 
 /**
@@ -377,7 +471,7 @@ export async function querySectionData(section: string): Promise<SectionRow[]> {
     case 'about': {
       return [
         { key: 'name', item: '钱包名称', value: 'HCoinWallet' },
-        { key: 'net', item: '网络环境', value: '主网 (Mainnet)' },
+        { key: 'net', item: '网络环境', value: '测试网 (Sepolia)' },
         { key: 'ver', item: '客户端版本', value: 'v0.0.1' },
         { key: 'db', item: '数据存储', value: 'LevelDB (classic-level)' },
       ];

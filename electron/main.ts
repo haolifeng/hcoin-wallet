@@ -3,6 +3,8 @@ import path from 'node:path';
 import {
   initDatabase,
   queryBalance,
+  queryEthBalance,
+  queryTokenBalances,
   querySectionData,
   generateMnemonic,
   isValidMnemonic,
@@ -10,9 +12,21 @@ import {
   listAccounts,
   decryptMnemonic,
   hasMnemonic,
-  unlockAccount,
+  unlockAccountWithSigner,
   closeDatabase,
 } from './db';
+import { startEthBalancePolling, stopEthBalancePolling, pollEthBalancesOnce } from './balance-poller';
+import { deriveWallet, sendEth, sendToken } from './eth';
+import { setActiveWallet, getActiveWallet, clearActiveWallet } from './session';
+
+/** 发送请求参数（资产类型） */
+type SendAsset = 'ETH' | 'USDT' | 'USDC';
+interface SendParams {
+  address: string;
+  asset: SendAsset;
+  to: string;
+  amount: string;
+}
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -51,9 +65,22 @@ app.whenReady().then(async () => {
   }
   createWindow();
 
+  // 后台轮询测试网（Sepolia）余额并写入数据库，供渲染进程查询
+  startEthBalancePolling();
+
   // IPC：渲染进程请求余额
   ipcMain.handle('wallet:getBalance', (_event, address: string) => {
     return queryBalance(address);
+  });
+
+  // IPC：渲染进程轮询请求 ETH 余额
+  ipcMain.handle('wallet:getEthBalance', (_event, address: string) => {
+    return queryEthBalance(address);
+  });
+
+  // IPC：渲染进程轮询请求 ERC-20 代币余额（symbol → 数值）
+  ipcMain.handle('wallet:getTokenBalances', (_event, address: string) => {
+    return queryTokenBalances(address);
   });
 
   // IPC：渲染进程请求左侧菜单对应分区的数据
@@ -73,8 +100,12 @@ app.whenReady().then(async () => {
 
   // IPC：创建账户（助记词 + 密码 → 主进程加密后写入 LevelDB，仅回传地址）
   // 创建与导入共用：导入时传入的是用户已有的助记词，同样加密落盘并派生 ETH 账户
-  ipcMain.handle('wallet:createAccount', (_event, mnemonic: string, password: string) => {
-    return createAccount(mnemonic, password);
+  ipcMain.handle('wallet:createAccount', async (_event, mnemonic: string, password: string) => {
+    const result = await createAccount(mnemonic, password);
+    // 建立签名会话（私钥仅存于主进程内存），随后立即触发一次余额轮询
+    setActiveWallet(result.address, deriveWallet(mnemonic));
+    void pollEthBalancesOnce();
+    return result;
   });
 
   // IPC：账户列表（备份时选择要备份的账户）
@@ -92,9 +123,32 @@ app.whenReady().then(async () => {
     return hasMnemonic();
   });
 
-  // IPC：解锁钱包（密码 → 解密助记词 → 派生 ETH 账户，仅回传两个地址）
-  ipcMain.handle('wallet:unlockWallet', (_event, address: string, password: string) => {
-    return unlockAccount(address, password);
+  // IPC：解锁钱包（密码 → 解密助记词 → 派生 ETH 账户；私钥仅存于主进程内存）
+  ipcMain.handle('wallet:unlockWallet', async (_event, address: string, password: string) => {
+    const { result, mnemonic } = await unlockAccountWithSigner(address, password);
+    setActiveWallet(result.address, deriveWallet(mnemonic));
+    return result;
+  });
+
+  // IPC：发送交易（ETH / USDT / USDC）。私钥只在主进程内用于签名，不落盘、不回传
+  ipcMain.handle('wallet:send', async (_event, params: SendParams) => {
+    const { address, asset, to, amount } = params ?? ({} as SendParams);
+    const active = getActiveWallet();
+    if (!active) throw new Error('钱包未解锁，无法发送');
+    if (active.address !== address) throw new Error('当前解锁账户与发送账户不一致');
+    if (!to?.trim()) throw new Error('请输入接收地址');
+
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('请输入有效的发送数量');
+
+    const txHash =
+      asset === 'ETH'
+        ? await sendEth(active.wallet, to.trim(), String(amount).trim())
+        : await sendToken(active.wallet, asset, to.trim(), String(amount).trim());
+
+    // 交易提交后立即刷新一次余额
+    void pollEthBalancesOnce();
+    return txHash;
   });
 
   // 说明：不实现 Tray / 后台常驻。macOS 上不再依赖 `activate` 重建窗口，
@@ -112,6 +166,8 @@ app.on('before-quit', (event) => {
   if (isQuitting) return;
   event.preventDefault();
   isQuitting = true;
+  stopEthBalancePolling();
+  clearActiveWallet();
   closeDatabase()
     .catch((err) => console.error('[main] 关闭数据库失败:', err))
     .finally(() => app.quit());

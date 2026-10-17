@@ -19,7 +19,7 @@ const FALLBACK_DATA: Record<string, SectionRow[]> = {
   ],
   about: [
     { key: 'name', item: '钱包名称', value: 'HCoinWallet' },
-    { key: 'net', item: '网络环境', value: '主网 (Mainnet)' },
+    { key: 'net', item: '网络环境', value: '测试网 (Sepolia)' },
     { key: 'ver', item: '客户端版本', value: 'v0.0.1' },
     { key: 'db', item: '数据存储', value: 'LevelDB (classic-level)' },
   ],
@@ -27,13 +27,10 @@ const FALLBACK_DATA: Record<string, SectionRow[]> = {
 
 export class MenuStore {
   menuItems: MenuItem[] = [
-    { key: 'dashboard', label: '总揽' },
     { key: 'accounts',  label: '账户' },
-    { key: 'balance',   label: '余额' },
-    { key: 'about',     label: '关于' },
   ];
 
-  selectedKey = 'dashboard';
+  selectedKey = 'accounts';
   rows: SectionRow[] = [];
   loading = false;
   error: string | null = null;

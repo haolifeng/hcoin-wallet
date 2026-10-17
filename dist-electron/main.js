@@ -21859,12 +21859,63 @@ src.getDefaultWordlist = getDefaultWordlist;
 var _wordlists_2 = _wordlists;
 src.wordlists = _wordlists_2.wordlists;
 const ETH_DERIVE_PATH = "m/44'/60'/0'/0/0";
-function deriveEthAccount(mnemonic) {
+const ETH_TESTNET_NAME = "Sepolia";
+const ETH_TESTNET_RPC_URL = process.env.ETH_TESTNET_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com";
+let provider = null;
+function getProvider() {
+  if (!provider) {
+    provider = new ethers.JsonRpcProvider(ETH_TESTNET_RPC_URL, void 0, {
+      staticNetwork: true
+    });
+  }
+  return provider;
+}
+async function fetchEthBalance(address) {
+  const wei = await getProvider().getBalance(address);
+  return Number(ethers.formatEther(wei));
+}
+const SUPPORTED_TOKENS = [
+  { symbol: "USDT", address: "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0", decimals: 6 },
+  { symbol: "USDC", address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", decimals: 6 }
+];
+const ERC20_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)"
+];
+async function fetchTokenBalance(owner, token) {
+  const contract = new ethers.Contract(token.address, ERC20_ABI, getProvider());
+  const raw = await contract.balanceOf(owner);
+  return Number(ethers.formatUnits(raw, token.decimals));
+}
+function getTokenBySymbol(symbol) {
+  const token = SUPPORTED_TOKENS.find((t) => t.symbol === symbol);
+  if (!token) throw new Error(`不支持的代币：${symbol}`);
+  return token;
+}
+function deriveWallet(mnemonic) {
   const phrase = mnemonic.trim().toLowerCase();
   if (!ethers.Mnemonic.isValidMnemonic(phrase)) {
     throw new Error("助记词不合法，无法派生 ETH 账户");
   }
-  const wallet = ethers.HDNodeWallet.fromPhrase(phrase, void 0, ETH_DERIVE_PATH);
+  return ethers.HDNodeWallet.fromPhrase(phrase, void 0, ETH_DERIVE_PATH);
+}
+async function sendEth(wallet, to, amount) {
+  const signer = wallet.connect(getProvider());
+  const tx = await signer.sendTransaction({
+    to: ethers.getAddress(to),
+    value: ethers.parseEther(amount)
+  });
+  return tx.hash;
+}
+async function sendToken(wallet, symbol, to, amount) {
+  const token = getTokenBySymbol(symbol);
+  const signer = wallet.connect(getProvider());
+  const contract = new ethers.Contract(token.address, ERC20_ABI, signer);
+  const tx = await contract.transfer(ethers.getAddress(to), ethers.parseUnits(amount, token.decimals));
+  return tx.hash;
+}
+function deriveEthAccount(mnemonic) {
+  const wallet = deriveWallet(mnemonic);
   return {
     address: wallet.address,
     publicKey: wallet.publicKey,
@@ -21890,13 +21941,9 @@ async function initDatabase() {
     if (cause) console.error("[db] 底层原因:", cause);
     throw err;
   }
-  const demoAddress = "HC0xDEMO0001";
-  if (!await db.has(accountKey(demoAddress))) {
-    await db.put(accountKey(demoAddress), {
-      address: demoAddress,
-      balance: 1234.56,
-      createdAt: Date.now()
-    });
+  const legacyDemoAddress = "HC0xDEMO0001";
+  if (await db.has(accountKey(legacyDemoAddress))) {
+    await db.del(accountKey(legacyDemoAddress));
   }
 }
 function generateMnemonic() {
@@ -21945,6 +21992,8 @@ async function createAccount(mnemonic, password) {
     address,
     balance: 0,
     createdAt: Date.now(),
+    ethBalance: 0,
+    tokenBalances: {},
     secret,
     ethAddress: eth.address,
     ethPath: eth.path
@@ -21981,7 +22030,7 @@ async function hasMnemonic() {
   }
   return { exists: Boolean(first), address: (first == null ? void 0 : first.address) ?? null };
 }
-async function unlockAccount(address, password) {
+async function unlockAccountWithSigner(address, password) {
   if (!db || db.status !== "open") {
     throw new Error("数据库尚未就绪，无法解锁账户");
   }
@@ -21999,7 +22048,7 @@ async function unlockAccount(address, password) {
     ethAddress = eth.address;
     await db.put(accountKey(address), { ...account, ethAddress, ethPath: eth.path });
   }
-  return { address, ethAddress };
+  return { result: { address, ethAddress }, mnemonic };
 }
 async function decryptMnemonic(address, password) {
   if (!db || db.status !== "open") {
@@ -22042,6 +22091,50 @@ async function queryBalance(address) {
     }
     throw err;
   }
+}
+async function queryEthBalance(address) {
+  if (!db || db.status !== "open") {
+    console.warn("[db] queryEthBalance 调用时数据库尚未就绪");
+    return 0;
+  }
+  try {
+    const account = await db.get(accountKey(address));
+    return (account == null ? void 0 : account.ethBalance) ?? 0;
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "LEVEL_NOT_FOUND") {
+      return 0;
+    }
+    throw err;
+  }
+}
+async function setEthBalance(address, ethBalance) {
+  if (!db || db.status !== "open") {
+    console.warn("[db] setEthBalance 调用时数据库尚未就绪");
+    return;
+  }
+  const account = await db.get(accountKey(address)).catch(() => null);
+  if (!account) return;
+  await db.put(accountKey(address), { ...account, ethBalance });
+}
+async function setTokenBalances(address, balances) {
+  if (!db || db.status !== "open") {
+    console.warn("[db] setTokenBalances 调用时数据库尚未就绪");
+    return;
+  }
+  const account = await db.get(accountKey(address)).catch(() => null);
+  if (!account) return;
+  await db.put(accountKey(address), {
+    ...account,
+    tokenBalances: { ...account.tokenBalances ?? {}, ...balances }
+  });
+}
+async function queryTokenBalances(address) {
+  if (!db || db.status !== "open") {
+    console.warn("[db] queryTokenBalances 调用时数据库尚未就绪");
+    return {};
+  }
+  const account = await db.get(accountKey(address)).catch(() => null);
+  return (account == null ? void 0 : account.tokenBalances) ?? {};
 }
 async function closeDatabase() {
   if (db && db.status === "open") {
@@ -22105,7 +22198,7 @@ async function querySectionData(section) {
     case "about": {
       return [
         { key: "name", item: "钱包名称", value: "HCoinWallet" },
-        { key: "net", item: "网络环境", value: "主网 (Mainnet)" },
+        { key: "net", item: "网络环境", value: "测试网 (Sepolia)" },
         { key: "ver", item: "客户端版本", value: "v0.0.1" },
         { key: "db", item: "数据存储", value: "LevelDB (classic-level)" }
       ];
@@ -22113,6 +22206,79 @@ async function querySectionData(section) {
     default:
       return [];
   }
+}
+const POLL_INTERVAL_MS = 15e3;
+let timer = null;
+let polling = false;
+async function pollEthBalancesOnce() {
+  if (polling) return;
+  polling = true;
+  try {
+    const accounts = (await listAccounts()).filter(
+      (a) => Boolean(a.ethAddress)
+    );
+    await Promise.all(
+      accounts.map(async (account) => {
+        const results = await Promise.allSettled([
+          fetchEthBalance(account.ethAddress),
+          ...SUPPORTED_TOKENS.map((token) => fetchTokenBalance(account.ethAddress, token))
+        ]);
+        const [ethResult, ...tokenResults] = results;
+        if (ethResult.status === "fulfilled") {
+          await setEthBalance(account.address, ethResult.value).catch(
+            (err) => console.error(`[balance] 写入 ${account.address} ETH 余额失败:`, err)
+          );
+        } else {
+          console.error(`[balance] 查询 ${account.ethAddress} ETH 余额失败:`, ethResult.reason);
+        }
+        const tokenBalances = {};
+        tokenResults.forEach((result, index) => {
+          const token = SUPPORTED_TOKENS[index];
+          if (result.status === "fulfilled") {
+            tokenBalances[token.symbol] = result.value;
+          } else {
+            console.error(
+              `[balance] 查询 ${account.ethAddress} ${token.symbol} 余额失败:`,
+              result.reason
+            );
+          }
+        });
+        if (Object.keys(tokenBalances).length > 0) {
+          await setTokenBalances(account.address, tokenBalances).catch(
+            (err) => console.error(`[balance] 写入 ${account.address} 代币余额失败:`, err)
+          );
+        }
+      })
+    );
+  } catch (err) {
+    console.error("[balance] 轮询余额失败:", err);
+  } finally {
+    polling = false;
+  }
+}
+function startEthBalancePolling() {
+  if (timer) return;
+  console.log(`[balance] 启动余额轮询（${ETH_TESTNET_NAME} 测试网 · ETH/USDT/USDC）`);
+  void pollEthBalancesOnce();
+  timer = setInterval(() => {
+    void pollEthBalancesOnce();
+  }, POLL_INTERVAL_MS);
+}
+function stopEthBalancePolling() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+let activeWallet = null;
+function setActiveWallet(address, wallet) {
+  activeWallet = { address, wallet };
+}
+function getActiveWallet() {
+  return activeWallet;
+}
+function clearActiveWallet() {
+  activeWallet = null;
 }
 let mainWindow = null;
 function createWindow() {
@@ -22145,8 +22311,15 @@ electron.app.whenReady().then(async () => {
     console.error("[main] 数据库初始化失败，应用将以只读/无数据方式继续运行:", err);
   }
   createWindow();
+  startEthBalancePolling();
   electron.ipcMain.handle("wallet:getBalance", (_event, address) => {
     return queryBalance(address);
+  });
+  electron.ipcMain.handle("wallet:getEthBalance", (_event, address) => {
+    return queryEthBalance(address);
+  });
+  electron.ipcMain.handle("wallet:getTokenBalances", (_event, address) => {
+    return queryTokenBalances(address);
   });
   electron.ipcMain.handle("wallet:getSectionData", (_event, section) => {
     return querySectionData(section);
@@ -22157,8 +22330,11 @@ electron.app.whenReady().then(async () => {
   electron.ipcMain.handle("wallet:validateMnemonic", (_event, mnemonic) => {
     return isValidMnemonic(mnemonic);
   });
-  electron.ipcMain.handle("wallet:createAccount", (_event, mnemonic, password) => {
-    return createAccount(mnemonic, password);
+  electron.ipcMain.handle("wallet:createAccount", async (_event, mnemonic, password) => {
+    const result = await createAccount(mnemonic, password);
+    setActiveWallet(result.address, deriveWallet(mnemonic));
+    void pollEthBalancesOnce();
+    return result;
   });
   electron.ipcMain.handle("wallet:listAccounts", () => {
     return listAccounts();
@@ -22169,8 +22345,22 @@ electron.app.whenReady().then(async () => {
   electron.ipcMain.handle("wallet:hasMnemonic", () => {
     return hasMnemonic();
   });
-  electron.ipcMain.handle("wallet:unlockWallet", (_event, address, password) => {
-    return unlockAccount(address, password);
+  electron.ipcMain.handle("wallet:unlockWallet", async (_event, address, password) => {
+    const { result, mnemonic } = await unlockAccountWithSigner(address, password);
+    setActiveWallet(result.address, deriveWallet(mnemonic));
+    return result;
+  });
+  electron.ipcMain.handle("wallet:send", async (_event, params) => {
+    const { address, asset, to, amount } = params ?? {};
+    const active = getActiveWallet();
+    if (!active) throw new Error("钱包未解锁，无法发送");
+    if (active.address !== address) throw new Error("当前解锁账户与发送账户不一致");
+    if (!(to == null ? void 0 : to.trim())) throw new Error("请输入接收地址");
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error("请输入有效的发送数量");
+    const txHash = asset === "ETH" ? await sendEth(active.wallet, to.trim(), String(amount).trim()) : await sendToken(active.wallet, asset, to.trim(), String(amount).trim());
+    void pollEthBalancesOnce();
+    return txHash;
   });
 });
 electron.app.on("window-all-closed", () => {
@@ -22181,5 +22371,7 @@ electron.app.on("before-quit", (event) => {
   if (isQuitting) return;
   event.preventDefault();
   isQuitting = true;
+  stopEthBalancePolling();
+  clearActiveWallet();
   closeDatabase().catch((err) => console.error("[main] 关闭数据库失败:", err)).finally(() => electron.app.quit());
 });

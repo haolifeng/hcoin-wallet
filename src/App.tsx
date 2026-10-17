@@ -12,6 +12,7 @@ import StartupScreen from './components/StartupScreen';
 import StartupChoiceModal from './components/StartupChoiceModal';
 import UnlockModal from './components/UnlockModal';
 import ImportWalletModal from './components/ImportWalletModal';
+import SendModal from './components/SendModal';
 import { startupStore } from './stores/StartupStore';
 
 const { Header: AHeader, Content, Footer: AFooter, Sider } = Layout;
@@ -134,6 +135,8 @@ export default function App() {
       <UnlockModal />
       {/* 导入助记词向导 */}
       <ImportWalletModal />
+      {/* 发送 ETH / USDT / USDC */}
+      <SendModal />
     </Layout>
   );
 }
