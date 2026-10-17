@@ -14,13 +14,26 @@ import UnlockModal from './components/UnlockModal';
 import ImportWalletModal from './components/ImportWalletModal';
 import SendModal from './components/SendModal';
 import { startupStore } from './stores/StartupStore';
+import { priceStore } from './stores/PriceStore';
 
 const { Header: AHeader, Content, Footer: AFooter, Sider } = Layout;
+
+/** 价格刷新间隔（毫秒） */
+const PRICE_POLL_INTERVAL = 60000;
 
 export default function App() {
   // 启动流程：检测助记词 → 创建 / 解锁
   useEffect(() => {
     void startupStore.init();
+  }, []);
+
+  // 全局拉取币种价格（总览 / 单链视图共用）
+  useEffect(() => {
+    void priceStore.refresh();
+    const timer = window.setInterval(() => {
+      void priceStore.refresh();
+    }, PRICE_POLL_INTERVAL);
+    return () => window.clearInterval(timer);
   }, []);
 
   return (

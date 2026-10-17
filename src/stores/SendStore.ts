@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { startupStore } from './StartupStore';
-import { CHAINS, buildAssetValue } from '../constants/chains';
+import { CHAINS, buildAssetValue, resolveChainAddress, type ChainDisplay } from '../constants/chains';
 
 /**
  * 发送交易弹窗状态。
@@ -18,14 +18,23 @@ class SendStore {
   error: string | null = null;
   /** 发送成功后的交易哈希 */
   txHash: string | null = null;
+  /** 是否锁定资产：从某个币种行发起发送时，只允许发送该币种 */
+  lockAsset = false;
 
   constructor() {
     makeAutoObservable(this);
   }
 
-  /** 打开弹窗，可指定默认资产（格式 `<chainKey>:<symbol>`，默认 ETH 链的 ETH） */
-  open(selection: string = buildAssetValue('eth', 'ETH')): void {
+  /**
+   * 打开弹窗，可指定默认资产（格式 `<chainKey>:<symbol>`，默认 ETH 链的 ETH）。
+   * lockAsset 为 true 时锁定该资产，用户只能发送选中的币种。
+   */
+  open(
+    selection: string = buildAssetValue('eth', 'ETH'),
+    options: { lockAsset?: boolean } = {},
+  ): void {
     this.applySelection(selection);
+    this.lockAsset = Boolean(options.lockAsset);
     this.visible = true;
     this.to = '';
     this.amount = '';
@@ -40,6 +49,7 @@ class SendStore {
     this.txHash = null;
     this.to = '';
     this.amount = '';
+    this.lockAsset = false;
   }
 
   /** 解析并设置当前选中的链与资产 */
@@ -60,6 +70,19 @@ class SendStore {
 
   setAmount(value: string): void {
     this.amount = value;
+  }
+
+  /** 当前选中链的展示配置 */
+  get currentChain(): ChainDisplay | undefined {
+    return CHAINS.find((c) => c.key === this.chain);
+  }
+
+  /** 当前链上的发送方地址（from） */
+  get fromAddress(): string | undefined {
+    const account = startupStore.account;
+    const chain = this.currentChain;
+    if (!account || !chain) return undefined;
+    return resolveChainAddress(chain, account);
   }
 
   /** 当前选中资产的可用余额（用于界面展示 / 校验） */

@@ -1,5 +1,4 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import { menuStore } from './MenuStore';
 import { validatePassword } from './CreateWalletStore';
 import type { UnlockResult } from '../types/global';
 
@@ -147,12 +146,6 @@ class ImportWalletStore {
         throw new Error('当前环境不支持导入（未检测到 Electron 接口）');
       }
       const result = await api.createAccount(this.mnemonicPhrase, this.password);
-      // 刷新数据；切到「账户」分区，方便直接看到导入的账户
-      if (menuStore.selectedKey !== 'accounts') {
-        menuStore.select('accounts');
-      } else {
-        void menuStore.loadData();
-      }
       runInAction(() => {
         this.loading = false;
       });

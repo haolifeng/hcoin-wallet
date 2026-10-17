@@ -1,4 +1,6 @@
 /** 前端展示用的链配置（与主进程 chains.ts 保持一致） */
+import type { UnlockResult } from '../types/global';
+
 export interface ChainDisplay {
   /** 链 key，如 'eth' / 'avax' / 'btc' */
   key: string;
@@ -52,6 +54,19 @@ export const CHAINS: ChainDisplay[] = [
 /** 发送资产选项的值格式：`<chainKey>:<symbol>` */
 export function buildAssetValue(chainKey: string, symbol: string): string {
   return `${chainKey}:${symbol}`;
+}
+
+/**
+ * 取账户在指定链上的收发地址：
+ * EVM 链（ETH / AVAX）共用 ethAddress，BTC / SOL 使用各自独立地址。
+ */
+export function resolveChainAddress(
+  chain: ChainDisplay,
+  account: Pick<UnlockResult, 'ethAddress' | 'btcAddress' | 'solAddress'>,
+): string {
+  if (chain.kind === 'bitcoin') return account.btcAddress;
+  if (chain.kind === 'solana') return account.solAddress;
+  return account.ethAddress;
 }
 
 /** 可发送的资产选项（按链分组） */

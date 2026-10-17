@@ -1,5 +1,4 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import { menuStore } from './MenuStore';
 import { createWalletStore } from './CreateWalletStore';
 import { importWalletStore } from './ImportWalletStore';
 import type { AccountBrief } from './SettingsStore';
@@ -134,7 +133,6 @@ class StartupStore {
         this.phase = 'ready';
         this.loading = false;
       });
-      void menuStore.loadData();
       return result;
     } catch (err) {
       runInAction(() => {
@@ -152,7 +150,6 @@ class StartupStore {
       this.phase = 'ready';
       this.error = null;
     });
-    void menuStore.loadData();
   }
 
   /**

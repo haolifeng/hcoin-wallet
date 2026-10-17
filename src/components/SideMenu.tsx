@@ -9,9 +9,8 @@ const SideMenu = observer(() => {
       selectedKeys={[menuStore.selectedKey]}
       onClick={({ key }) => menuStore.select(key)}
       style={{ height: '100%', borderRight: 0 }}
-    >
-      <Menu.Item key="accounts">账户</Menu.Item>
-    </Menu>
+      items={menuStore.menuItems.map((item) => ({ key: item.key, label: item.label }))}
+    />
   );
 });
 

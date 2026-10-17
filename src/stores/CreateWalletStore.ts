@@ -1,5 +1,4 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import { menuStore } from './MenuStore';
 import type { UnlockResult } from '../types/global';
 
 const WORD_COUNT = 12;
@@ -172,12 +171,6 @@ class CreateWalletStore {
       }
       // 主进程加密助记词后落盘，并派生 ETH 账户地址一并返回
       const result = await api.createAccount(this.mnemonicPhrase, this.password);
-      // 刷新数据；切到「账户」分区，方便直接看到新建的账户
-      if (menuStore.selectedKey !== 'accounts') {
-        menuStore.select('accounts');
-      } else {
-        void menuStore.loadData();
-      }
       runInAction(() => {
         this.loading = false;
       });

@@ -15,6 +15,12 @@ const SendModal = observer(() => {
   const isSol = currentChain?.kind === 'solana';
   const isMainnet = isBtc || isSol;
 
+  // 锁定时只保留当前选中的币种，用户无法切换到其它资产
+  const selectedAssetValue = buildAssetValue(store.chain, store.asset);
+  const assetOptions = store.lockAsset
+    ? SEND_ASSET_OPTIONS.filter((option) => option.value === selectedAssetValue)
+    : SEND_ASSET_OPTIONS;
+
   const handleSubmit = async () => {
     try {
       await store.submit();
@@ -95,11 +101,21 @@ const SendModal = observer(() => {
           <div style={{ marginBottom: 12 }}>
             <Text strong>资产</Text>
             <Select
-              value={buildAssetValue(store.chain, store.asset)}
+              value={selectedAssetValue}
               onChange={(value: string) => store.setSelection(value)}
-              options={SEND_ASSET_OPTIONS}
+              options={assetOptions}
+              disabled={store.lockAsset}
               style={{ width: '100%', marginTop: 4 }}
             />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <Text strong>发送方（From）</Text>
+            <div style={{ marginTop: 4 }}>
+              <Text code copyable={Boolean(store.fromAddress)} style={{ wordBreak: 'break-all' }}>
+                {store.fromAddress ?? '—'}
+              </Text>
+            </div>
           </div>
 
           <div style={{ marginBottom: 12 }}>
