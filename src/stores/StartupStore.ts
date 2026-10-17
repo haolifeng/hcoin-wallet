@@ -3,7 +3,7 @@ import { menuStore } from './MenuStore';
 import { createWalletStore } from './CreateWalletStore';
 import { importWalletStore } from './ImportWalletStore';
 import type { AccountBrief } from './SettingsStore';
-import type { UnlockResult } from '../types/global';
+import type { UnlockResult, ChainBalances } from '../types/global';
 
 /**
  * 启动流程阶段：
@@ -33,10 +33,8 @@ class StartupStore {
   error: string | null = null;
   /** 当前会话已解锁的账户（钱包地址 + ETH 地址） */
   account: UnlockResult | null = null;
-  /** 当前账户的 ETH 余额（由前台轮询数据库更新） */
-  ethBalance: number | null = null;
-  /** 当前账户的各 ERC-20 代币余额（symbol → 数值），由前台轮询数据库更新 */
-  tokenBalances: Record<string, number> = {};
+  /** 当前账户的各链余额（链 key → { native, tokens }），由前台轮询数据库更新 */
+  chainBalances: ChainBalances = {};
   /** 余额轮询加载状态（首次加载时可展示 loading） */
   balanceLoading = false;
 
@@ -158,21 +156,18 @@ class StartupStore {
   }
 
   /**
-   * 轮询读取当前账户的 ETH 与 ERC-20 代币余额：通过 IPC 查询主进程数据库。
+   * 轮询读取当前账户的各链余额（ETH / AVAX / USDT / USDC）：
+   * 通过 IPC 查询主进程数据库。
    * 未解锁、非 Electron 环境或查询失败时静默跳过，保留上一次的值。
    */
   async refreshBalances(): Promise<void> {
     const address = this.account?.address;
     const api = window.walletAPI;
-    if (!address || !api?.getEthBalance) return;
+    if (!address || !api?.getChainBalances) return;
     try {
-      const [ethBalance, tokenBalances] = await Promise.all([
-        api.getEthBalance(address),
-        api.getTokenBalances?.(address) ?? Promise.resolve({}),
-      ]);
+      const chainBalances = await api.getChainBalances(address);
       runInAction(() => {
-        this.ethBalance = ethBalance;
-        this.tokenBalances = tokenBalances;
+        this.chainBalances = chainBalances;
         this.balanceLoading = false;
       });
     } catch {

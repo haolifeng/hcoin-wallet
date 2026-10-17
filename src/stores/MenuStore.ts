@@ -9,13 +9,13 @@ export interface MenuItem {
 // 浏览器（非 Electron）环境下的兜底演示数据，保证 `vite dev` 也能看到效果
 const FALLBACK_DATA: Record<string, SectionRow[]> = {
   dashboard: [
-    { key: 'a1', address: 'HC0xDEMO0001', balance: '1234.56', createdAt: '2026/01/01 10:00:00' },
+    { key: 'a1', address: '0xDEMO0001', balance: '1234.56', createdAt: '2026/01/01 10:00:00' },
   ],
   accounts: [
-    { key: 'a1', address: 'HC0xDEMO0001', balance: '1234.56', createdAt: '2026/01/01 10:00:00' },
+    { key: 'a1', address: '0xDEMO0001', balance: '1234.56', createdAt: '2026/01/01 10:00:00' },
   ],
   balance: [
-    { key: 'a1', address: 'HC0xDEMO0001', balance: '1234.56' },
+    { key: 'a1', address: '0xDEMO0001', balance: '1234.56' },
   ],
   about: [
     { key: 'name', item: '钱包名称', value: 'HCoinWallet' },

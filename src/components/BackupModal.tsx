@@ -1,6 +1,7 @@
 import { Alert, Button, Col, Input, Modal, Row, Select, Spin, Typography, message } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { settingsStore } from '../stores/SettingsStore';
+import { formatAccountAddress } from '../utils/format';
 
 const { Text } = Typography;
 
@@ -33,7 +34,9 @@ const BackupModal = observer(() => {
             onChange={(value: string) => store.setSelectedAddress(value)}
             options={store.accounts.map(({ address, hasSecret }) => ({
               value: address,
-              label: hasSecret ? address : `${address}（无备份数据）`,
+              label: hasSecret
+                ? formatAccountAddress(address)
+                : `${formatAccountAddress(address)}（无备份数据）`,
               disabled: !hasSecret,
             }))}
             style={{ width: '100%', marginTop: 4 }}

@@ -3,8 +3,7 @@ import path from 'node:path';
 import {
   initDatabase,
   queryBalance,
-  queryEthBalance,
-  queryTokenBalances,
+  queryChainBalances,
   querySectionData,
   generateMnemonic,
   isValidMnemonic,
@@ -16,14 +15,19 @@ import {
   closeDatabase,
 } from './db';
 import { startEthBalancePolling, stopEthBalancePolling, pollEthBalancesOnce } from './balance-poller';
-import { deriveWallet, sendEth, sendToken } from './eth';
+import { deriveWallet, getChain, sendNative, sendChainToken } from './chains';
+import { deriveBtcAccount, sendBtc } from './bitcoin';
+import { deriveSolAccount, sendSol } from './solana';
 import { setActiveWallet, getActiveWallet, clearActiveWallet } from './session';
 
-/** 发送请求参数（资产类型） */
-type SendAsset = 'ETH' | 'USDT' | 'USDC';
+/** 发送请求参数 */
 interface SendParams {
+  /** 钱包账户地址（数据库键） */
   address: string;
-  asset: SendAsset;
+  /** 链 key，如 'eth' / 'avax' */
+  chain: string;
+  /** 资产符号：原生代币或 ERC-20 代币，如 ETH / AVAX / BTC / SOL / USDT / USDC */
+  asset: string;
   to: string;
   amount: string;
 }
@@ -65,7 +69,7 @@ app.whenReady().then(async () => {
   }
   createWindow();
 
-  // 后台轮询测试网（Sepolia）余额并写入数据库，供渲染进程查询
+  // 后台轮询各测试网（Sepolia / Fuji）余额并写入数据库，供渲染进程查询
   startEthBalancePolling();
 
   // IPC：渲染进程请求余额
@@ -73,14 +77,9 @@ app.whenReady().then(async () => {
     return queryBalance(address);
   });
 
-  // IPC：渲染进程轮询请求 ETH 余额
-  ipcMain.handle('wallet:getEthBalance', (_event, address: string) => {
-    return queryEthBalance(address);
-  });
-
-  // IPC：渲染进程轮询请求 ERC-20 代币余额（symbol → 数值）
-  ipcMain.handle('wallet:getTokenBalances', (_event, address: string) => {
-    return queryTokenBalances(address);
+  // IPC：渲染进程轮询请求各链余额（链 key → { native, tokens }）
+  ipcMain.handle('wallet:getChainBalances', (_event, address: string) => {
+    return queryChainBalances(address);
   });
 
   // IPC：渲染进程请求左侧菜单对应分区的数据
@@ -102,8 +101,13 @@ app.whenReady().then(async () => {
   // 创建与导入共用：导入时传入的是用户已有的助记词，同样加密落盘并派生 ETH 账户
   ipcMain.handle('wallet:createAccount', async (_event, mnemonic: string, password: string) => {
     const result = await createAccount(mnemonic, password);
-    // 建立签名会话（私钥仅存于主进程内存），随后立即触发一次余额轮询
-    setActiveWallet(result.address, deriveWallet(mnemonic));
+    // 建立签名会话（EVM + BTC + SOL 私钥仅存于主进程内存），随后立即触发一次余额轮询
+    setActiveWallet(
+      result.address,
+      deriveWallet(mnemonic),
+      deriveBtcAccount(mnemonic),
+      deriveSolAccount(mnemonic),
+    );
     void pollEthBalancesOnce();
     return result;
   });
@@ -126,13 +130,19 @@ app.whenReady().then(async () => {
   // IPC：解锁钱包（密码 → 解密助记词 → 派生 ETH 账户；私钥仅存于主进程内存）
   ipcMain.handle('wallet:unlockWallet', async (_event, address: string, password: string) => {
     const { result, mnemonic } = await unlockAccountWithSigner(address, password);
-    setActiveWallet(result.address, deriveWallet(mnemonic));
+    setActiveWallet(
+      result.address,
+      deriveWallet(mnemonic),
+      deriveBtcAccount(mnemonic),
+      deriveSolAccount(mnemonic),
+    );
     return result;
   });
 
-  // IPC：发送交易（ETH / USDT / USDC）。私钥只在主进程内用于签名，不落盘、不回传
+  // IPC：发送交易（原生代币 ETH / AVAX，或 ERC-20 USDT / USDC）。
+  // 私钥只在主进程内用于签名，不落盘、不回传
   ipcMain.handle('wallet:send', async (_event, params: SendParams) => {
-    const { address, asset, to, amount } = params ?? ({} as SendParams);
+    const { address, chain: chainKey, asset, to, amount } = params ?? ({} as SendParams);
     const active = getActiveWallet();
     if (!active) throw new Error('钱包未解锁，无法发送');
     if (active.address !== address) throw new Error('当前解锁账户与发送账户不一致');
@@ -141,10 +151,24 @@ app.whenReady().then(async () => {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) throw new Error('请输入有效的发送数量');
 
-    const txHash =
-      asset === 'ETH'
-        ? await sendEth(active.wallet, to.trim(), String(amount).trim())
-        : await sendToken(active.wallet, asset, to.trim(), String(amount).trim());
+    const chain = getChain(chainKey);
+    let txHash: string;
+    if (chain.kind === 'bitcoin') {
+      if (asset !== chain.nativeSymbol) {
+        throw new Error(`链 ${chain.name} 不支持资产：${asset}`);
+      }
+      txHash = await sendBtc(active.btc, to.trim(), String(amount).trim());
+    } else if (chain.kind === 'solana') {
+      if (asset !== chain.nativeSymbol) {
+        throw new Error(`链 ${chain.name} 不支持资产：${asset}`);
+      }
+      txHash = await sendSol(active.sol.secretKey, to.trim(), String(amount).trim());
+    } else {
+      txHash =
+        asset === chain.nativeSymbol
+          ? await sendNative(chainKey, active.wallet, to.trim(), String(amount).trim())
+          : await sendChainToken(chainKey, active.wallet, asset, to.trim(), String(amount).trim());
+    }
 
     // 交易提交后立即刷新一次余额
     void pollEthBalancesOnce();

@@ -3,10 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('walletAPI', {
   getBalance: (address: string) =>
     ipcRenderer.invoke('wallet:getBalance', address),
-  getEthBalance: (address: string) =>
-    ipcRenderer.invoke('wallet:getEthBalance', address),
-  getTokenBalances: (address: string) =>
-    ipcRenderer.invoke('wallet:getTokenBalances', address),
+  getChainBalances: (address: string) =>
+    ipcRenderer.invoke('wallet:getChainBalances', address),
   getSectionData: (section: string) =>
     ipcRenderer.invoke('wallet:getSectionData', section),
   generateMnemonic: () =>
@@ -23,7 +21,8 @@ contextBridge.exposeInMainWorld('walletAPI', {
     ipcRenderer.invoke('wallet:unlockWallet', address, password),
   send: (params: {
     address: string;
-    asset: 'ETH' | 'USDT' | 'USDC';
+    chain: string;
+    asset: string;
     to: string;
     amount: string;
   }) => ipcRenderer.invoke('wallet:send', params),

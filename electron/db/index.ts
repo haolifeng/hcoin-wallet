@@ -9,7 +9,9 @@ import {
 import path from 'node:path';
 import { app } from 'electron';
 import { generateMnemonic as generateBip39Mnemonic, validateMnemonic } from 'bip39';
-import { deriveEthAccount } from '../eth';
+import { deriveEthAccount } from '../chains';
+import { deriveBtcAccount } from '../bitcoin';
+import { deriveSolAccount } from '../solana';
 
 /** 助记词对称加密后的密文结构（只落盘密文，明文永不写入数据库） */
 export interface EncryptedSecret {
@@ -27,19 +29,37 @@ export interface EncryptedSecret {
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
 const KEY_LENGTH = 32;
 
+/** 单条链的余额：原生代币 + 各 ERC-20 代币 */
+export interface ChainBalance {
+  /** 原生代币余额（ETH / AVAX） */
+  native?: number;
+  /** ERC-20 代币余额（symbol → 数值） */
+  tokens?: Record<string, number>;
+}
+
 export interface Account {
   address: string;
   balance: number;
   createdAt: number;
-  /** ETH 账户余额（单位 ETH），由主进程同步写入，前台轮询读取展示 */
+  /** 各链余额（链 key → 余额），由主进程轮询测试网后写入，前台轮询读取展示 */
+  chainBalances?: Record<string, ChainBalance>;
+  /** @deprecated 旧版单链字段，启动时迁移到 chainBalances.eth */
   ethBalance?: number;
-  /** 各 ERC-20 代币余额（symbol → 数值），由主进程轮询测试网后写入 */
+  /** @deprecated 旧版单链字段，启动时迁移到 chainBalances.eth */
   tokenBalances?: Record<string, number>;
   secret?: EncryptedSecret;
-  /** 由助记词派生的 ETH 账户地址，解锁/创建时写入，便于界面直接展示 */
+  /** 由助记词派生的账户地址（ETH 与 AVAX 共用），解锁/创建时写入，便于界面直接展示 */
   ethAddress?: string;
-  /** ETH 账户使用的 BIP44 派生路径 */
+  /** 账户使用的 BIP44 派生路径 */
   ethPath?: string;
+  /** 由助记词派生的 BTC 主网地址（BIP84 Native SegWit），解锁/创建时写入 */
+  btcAddress?: string;
+  /** 账户使用的 BIP84 派生路径 */
+  btcPath?: string;
+  /** 由助记词派生的 Solana 主网地址（SLIP-0010 Ed25519），解锁/创建时写入 */
+  solAddress?: string;
+  /** 账户使用的 Solana 派生路径 */
+  solPath?: string;
 }
 
 /** 启动时检测结果：数据库里是否已经存在加密助记词 */
@@ -49,10 +69,12 @@ export interface MnemonicState {
   address: string | null;
 }
 
-/** 解锁结果：钱包账户地址 + 派生出的 ETH 账户地址 */
+/** 解锁结果：钱包账户地址 + 派生出的 ETH 地址（ETH/AVAX 共用） + BTC 地址 + Solana 地址 */
 export interface UnlockResult {
   address: string;
   ethAddress: string;
+  btcAddress: string;
+  solAddress: string;
 }
 
 /** 中间内容区展示用的通用数据行 */
@@ -93,6 +115,62 @@ export async function initDatabase(): Promise<void> {
   if (await db.has(accountKey(legacyDemoAddress))) {
     await db.del(accountKey(legacyDemoAddress));
   }
+
+  // 迁移历史账户地址格式：早期为 "HC0x…"，现统一为 "0x…"
+  await migrateLegacyAddresses();
+
+  // 迁移旧版单链余额字段到多链结构
+  await migrateLegacyChainBalances();
+}
+
+/**
+ * 迁移旧版单链余额字段（ethBalance / tokenBalances）到多链结构 chainBalances.eth。
+ * 幂等：迁移后不再保留旧字段。
+ */
+async function migrateLegacyChainBalances(): Promise<void> {
+  const pending: { key: string; account: Account }[] = [];
+  for await (const [key, account] of db.iterator()) {
+    if (!key.startsWith('account:')) continue;
+    if (account.chainBalances) continue;
+    if (account.ethBalance === undefined && account.tokenBalances === undefined) continue;
+    pending.push({ key, account });
+  }
+  for (const { key, account } of pending) {
+    const { ethBalance, tokenBalances, chainBalances, ...rest } = account;
+    await db.put(key, {
+      ...rest,
+      chainBalances: chainBalances ?? {
+        eth: { native: ethBalance ?? 0, tokens: tokenBalances ?? {} },
+      },
+    });
+  }
+  if (pending.length > 0) {
+    console.log(`[db] 已迁移 ${pending.length} 个账户到多链余额结构`);
+  }
+}
+
+/**
+ * 迁移历史账户地址格式：把以 "HC" 开头的旧地址（键与 address 字段）改写为去掉 "HC" 的新格式。
+ * 幂等：迁移后不再存在以 "HC" 开头的账户键。
+ */
+async function migrateLegacyAddresses(): Promise<void> {
+  const legacy: { key: string; account: Account }[] = [];
+  // 先收集再改写，避免在迭代过程中修改数据
+  for await (const [key, account] of db.iterator()) {
+    if (key.startsWith('account:HC')) {
+      legacy.push({ key, account });
+    }
+  }
+  for (const { key, account } of legacy) {
+    const nextAddress = account.address.startsWith('HC')
+      ? account.address.slice(2)
+      : account.address;
+    await db.put(accountKey(nextAddress), { ...account, address: nextAddress });
+    await db.del(key);
+  }
+  if (legacy.length > 0) {
+    console.log(`[db] 已迁移 ${legacy.length} 个历史账户地址格式（去除 HC 前缀）`);
+  }
 }
 
 /**
@@ -108,9 +186,9 @@ export function isValidMnemonic(mnemonic: string): boolean {
   return validateMnemonic(mnemonic);
 }
 
-/** 由助记词派生地址：HC0x + sha256(助记词) 前 8 位大写十六进制 */
+/** 由助记词派生账户地址：0x + sha256(助记词) 前 8 位大写十六进制 */
 export function deriveAddress(mnemonic: string): string {
-  return `HC0x${createHash('sha256').update(mnemonic).digest('hex').slice(0, 8).toUpperCase()}`;
+  return `0x${createHash('sha256').update(mnemonic).digest('hex').slice(0, 8).toUpperCase()}`;
 }
 
 /** scrypt 派生密钥 + AES-256-GCM 加密助记词 */
@@ -156,25 +234,42 @@ export async function createAccount(
   }
 
   const secret = encryptMnemonic(mnemonic, password);
-  // 助记词此刻仍是明文，趁此派生 ETH 账户；派生后不再持有明文引用
+  // 助记词此刻仍是明文，趁此派生 ETH / BTC / SOL 账户；派生后不再持有明文引用
   const eth = deriveEthAccount(mnemonic);
+  const btc = deriveBtcAccount(mnemonic);
+  const sol = deriveSolAccount(mnemonic);
   await db.put(accountKey(address), {
     address,
     balance: 0,
     createdAt: Date.now(),
-    ethBalance: 0,
-    tokenBalances: {},
+    chainBalances: {},
     secret,
     ethAddress: eth.address,
     ethPath: eth.path,
+    btcAddress: btc.address,
+    btcPath: btc.path,
+    solAddress: sol.address,
+    solPath: sol.path,
   });
 
-  return { address, ethAddress: eth.address };
+  return {
+    address,
+    ethAddress: eth.address,
+    btcAddress: btc.address,
+    solAddress: sol.address,
+  };
 }
 
-/** 列出所有账户（地址 + 创建时间 + 是否含加密助记词 + ETH 地址，按创建时间升序） */
+/** 列出所有账户（地址 + 创建时间 + 是否含加密助记词 + EVM/BTC/SOL 地址，按创建时间升序） */
 export async function listAccounts(): Promise<
-  { address: string; createdAt: number; hasSecret: boolean; ethAddress?: string }[]
+  {
+    address: string;
+    createdAt: number;
+    hasSecret: boolean;
+    ethAddress?: string;
+    btcAddress?: string;
+    solAddress?: string;
+  }[]
 > {
   if (!db || db.status !== 'open') {
     throw new Error('数据库尚未就绪，无法读取账户列表');
@@ -184,6 +279,8 @@ export async function listAccounts(): Promise<
     createdAt: number;
     hasSecret: boolean;
     ethAddress?: string;
+    btcAddress?: string;
+    solAddress?: string;
   }[] = [];
   for await (const [key, account] of db.iterator()) {
     if (!key.startsWith('account:')) continue;
@@ -192,6 +289,8 @@ export async function listAccounts(): Promise<
       createdAt: account.createdAt,
       hasSecret: Boolean(account.secret),
       ethAddress: account.ethAddress,
+      btcAddress: account.btcAddress,
+      solAddress: account.solAddress,
     });
   }
   return accounts.sort((a, b) => a.createdAt - b.createdAt);
@@ -224,7 +323,7 @@ export interface UnlockSession {
 }
 
 /**
- * 解锁钱包：用密码解密助记词 → 派生 ETH 账户 → 持久化 ETH 地址。
+ * 解锁钱包：用密码解密助记词 → 派生 ETH/BTC 账户 → 持久化地址。
  * 明文助记词随返回值交予主进程建立签名会话，不会写入数据库或回传渲染进程；
  * 密码错误由 decryptMnemonic 抛出。
  */
@@ -245,15 +344,31 @@ export async function unlockAccountWithSigner(
     throw new Error('账户不存在');
   }
 
+  let updated = account;
   let ethAddress = account.ethAddress;
   if (!ethAddress) {
     // 历史账户（创建时尚未派生）在首次解锁时补派生并写回数据库
     const eth = deriveEthAccount(mnemonic);
     ethAddress = eth.address;
-    await db.put(accountKey(address), { ...account, ethAddress, ethPath: eth.path });
+    updated = { ...updated, ethAddress, ethPath: eth.path };
+  }
+  let btcAddress = account.btcAddress;
+  if (!btcAddress) {
+    const btc = deriveBtcAccount(mnemonic);
+    btcAddress = btc.address;
+    updated = { ...updated, btcAddress, btcPath: btc.path };
+  }
+  let solAddress = account.solAddress;
+  if (!solAddress) {
+    const sol = deriveSolAccount(mnemonic);
+    solAddress = sol.address;
+    updated = { ...updated, solAddress, solPath: sol.path };
+  }
+  if (updated !== account) {
+    await db.put(accountKey(address), updated);
   }
 
-  return { result: { address, ethAddress }, mnemonic };
+  return { result: { address, ethAddress, btcAddress, solAddress }, mnemonic };
 }
 
 /**
@@ -323,76 +438,69 @@ export async function queryBalance(address: string): Promise<number> {
 }
 
 /**
- * 按钱包账户地址查询 ETH 余额（供前台轮询展示）。
- * 账户不存在或数据库未就绪时返回 0。
+ * 按钱包账户地址查询各链余额（链 key → 余额），供前台轮询展示。
+ * 账户不存在或数据库未就绪时返回空对象。
  */
-export async function queryEthBalance(address: string): Promise<number> {
+export async function queryChainBalances(
+  address: string,
+): Promise<Record<string, ChainBalance>> {
   if (!db || db.status !== 'open') {
-    console.warn('[db] queryEthBalance 调用时数据库尚未就绪');
-    return 0;
-  }
-  try {
-    const account = await db.get(accountKey(address));
-    return account?.ethBalance ?? 0;
-  } catch (err: unknown) {
-    // classic-level 在 key 不存在时抛出 LEVEL_NOT_FOUND
-    if (
-      err &&
-      typeof err === 'object' &&
-      'code' in err &&
-      (err as { code: string }).code === 'LEVEL_NOT_FOUND'
-    ) {
-      return 0;
-    }
-    throw err;
-  }
-}
-
-/**
- * 更新账户的 ETH 余额（后台轮询测试网后写入数据库）。
- * 账户不存在或数据库未就绪时静默跳过。
- */
-export async function setEthBalance(address: string, ethBalance: number): Promise<void> {
-  if (!db || db.status !== 'open') {
-    console.warn('[db] setEthBalance 调用时数据库尚未就绪');
-    return;
+    console.warn('[db] queryChainBalances 调用时数据库尚未就绪');
+    return {};
   }
   const account = await db.get(accountKey(address)).catch(() => null);
-  if (!account) return;
-  await db.put(accountKey(address), { ...account, ethBalance });
+  return account?.chainBalances ?? {};
 }
 
 /**
- * 合并更新账户的 ERC-20 代币余额（后台轮询测试网后写入数据库）。
+ * 更新账户某条链的原生代币余额（后台轮询测试网后写入数据库）。
  * 账户不存在或数据库未就绪时静默跳过。
  */
-export async function setTokenBalances(
+export async function setChainNativeBalance(
   address: string,
-  balances: Record<string, number>,
+  chainKey: string,
+  native: number,
 ): Promise<void> {
   if (!db || db.status !== 'open') {
-    console.warn('[db] setTokenBalances 调用时数据库尚未就绪');
+    console.warn('[db] setChainNativeBalance 调用时数据库尚未就绪');
     return;
   }
   const account = await db.get(accountKey(address)).catch(() => null);
   if (!account) return;
+  const chainBalances = account.chainBalances ?? {};
   await db.put(accountKey(address), {
     ...account,
-    tokenBalances: { ...(account.tokenBalances ?? {}), ...balances },
+    chainBalances: {
+      ...chainBalances,
+      [chainKey]: { ...chainBalances[chainKey], native },
+    },
   });
 }
 
 /**
- * 按钱包账户地址查询该账户的所有 ERC-20 代币余额（symbol → 数值）。
- * 账户不存在或数据库未就绪时返回空对象。
+ * 合并更新账户某条链的 ERC-20 代币余额（后台轮询测试网后写入数据库）。
+ * 账户不存在或数据库未就绪时静默跳过。
  */
-export async function queryTokenBalances(address: string): Promise<Record<string, number>> {
+export async function setChainTokenBalances(
+  address: string,
+  chainKey: string,
+  balances: Record<string, number>,
+): Promise<void> {
   if (!db || db.status !== 'open') {
-    console.warn('[db] queryTokenBalances 调用时数据库尚未就绪');
-    return {};
+    console.warn('[db] setChainTokenBalances 调用时数据库尚未就绪');
+    return;
   }
   const account = await db.get(accountKey(address)).catch(() => null);
-  return account?.tokenBalances ?? {};
+  if (!account) return;
+  const chainBalances = account.chainBalances ?? {};
+  const chain = chainBalances[chainKey] ?? {};
+  await db.put(accountKey(address), {
+    ...account,
+    chainBalances: {
+      ...chainBalances,
+      [chainKey]: { ...chain, tokens: { ...(chain.tokens ?? {}), ...balances } },
+    },
+  });
 }
 
 /**

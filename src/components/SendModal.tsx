@@ -1,22 +1,19 @@
 import { Alert, Button, Input, Modal, Result, Select, Typography, message } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { sendStore } from '../stores/SendStore';
-import type { SendAsset } from '../types/global';
+import { CHAINS, SEND_ASSET_OPTIONS, buildAssetValue } from '../constants/chains';
 
 const { Text } = Typography;
 
-const ASSET_OPTIONS: { value: SendAsset; label: string }[] = [
-  { value: 'ETH', label: 'ETH' },
-  { value: 'USDT', label: 'USDT' },
-  { value: 'USDC', label: 'USDC' },
-];
-
-/** 测试网区块浏览器地址（Sepolia） */
-const EXPLORER_TX_URL = 'https://sepolia.etherscan.io/tx/';
-
-/** 发送 ETH / USDT / USDC 弹窗 */
+/** 发送 ETH / AVAX / BTC / USDT / USDC 弹窗（支持多链） */
 const SendModal = observer(() => {
   const store = sendStore;
+
+  const currentChain = CHAINS.find((c) => c.key === store.chain);
+  const explorerBase = currentChain?.explorerTxUrl ?? '';
+  const isBtc = currentChain?.kind === 'bitcoin';
+  const isSol = currentChain?.kind === 'solana';
+  const isMainnet = isBtc || isSol;
 
   const handleSubmit = async () => {
     try {
@@ -65,30 +62,42 @@ const SendModal = observer(() => {
         <Result
           status="success"
           title="交易已提交"
-          subTitle="交易已广播到 Sepolia 测试网，等待打包确认。"
+          subTitle={`交易已广播到 ${currentChain?.name ?? ''}${isMainnet ? ' 主网' : ' 测试网'}，等待打包确认。`}
           extra={
             <Text copyable={{ text: store.txHash }} style={{ wordBreak: 'break-all' }}>
               {store.txHash}
             </Text>
           }
         >
-          <Button
-            type="link"
-            href={`${EXPLORER_TX_URL}${store.txHash}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            在区块浏览器中查看
-          </Button>
+          {explorerBase && (
+            <Button
+              type="link"
+              href={`${explorerBase}${store.txHash}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              在区块浏览器中查看
+            </Button>
+          )}
         </Result>
       ) : (
         <>
+          {isMainnet && (
+            <Alert
+              type="warning"
+              showIcon
+              message={`${currentChain?.nativeSymbol ?? ''} 为主网，使用真实资金`}
+              description="交易一旦广播不可撤销，请务必核对接收地址与数量。"
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           <div style={{ marginBottom: 12 }}>
             <Text strong>资产</Text>
             <Select
-              value={store.asset}
-              onChange={(value: SendAsset) => store.setAsset(value)}
-              options={ASSET_OPTIONS}
+              value={buildAssetValue(store.chain, store.asset)}
+              onChange={(value: string) => store.setSelection(value)}
+              options={SEND_ASSET_OPTIONS}
               style={{ width: '100%', marginTop: 4 }}
             />
           </div>
@@ -97,7 +106,7 @@ const SendModal = observer(() => {
             <Text strong>接收地址</Text>
             <Input
               value={store.to}
-              placeholder="0x…"
+              placeholder={isBtc ? 'bc1…' : isSol ? 'base58…' : '0x…'}
               onChange={(e) => store.setTo(e.target.value)}
               style={{ marginTop: 4 }}
             />

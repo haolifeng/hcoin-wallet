@@ -1,4 +1,6 @@
 import type { HDNodeWallet } from 'ethers';
+import type { BtcAccount } from './bitcoin';
+import type { SolAccount } from './solana';
 
 /**
  * 主进程内存中的当前解锁会话。
@@ -8,15 +10,24 @@ import type { HDNodeWallet } from 'ethers';
 interface ActiveWallet {
   /** 钱包账户地址（数据库键） */
   address: string;
-  /** 可签名的 HD 钱包 */
+  /** 可签名的 EVM（ETH / AVAX）HD 钱包 */
   wallet: HDNodeWallet;
+  /** 可签名的 BTC 账户（含私钥，仅内存） */
+  btc: BtcAccount;
+  /** 可签名的 Solana 账户（含私钥，仅内存） */
+  sol: SolAccount;
 }
 
 let activeWallet: ActiveWallet | null = null;
 
 /** 建立解锁会话（解锁成功 / 创建或导入账户成功后调用） */
-export function setActiveWallet(address: string, wallet: HDNodeWallet): void {
-  activeWallet = { address, wallet };
+export function setActiveWallet(
+  address: string,
+  wallet: HDNodeWallet,
+  btc: BtcAccount,
+  sol: SolAccount,
+): void {
+  activeWallet = { address, wallet, btc, sol };
 }
 
 /** 读取当前解锁会话，未解锁时返回 null */

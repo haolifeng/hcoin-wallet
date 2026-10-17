@@ -2,8 +2,7 @@
 const electron = require("electron");
 electron.contextBridge.exposeInMainWorld("walletAPI", {
   getBalance: (address) => electron.ipcRenderer.invoke("wallet:getBalance", address),
-  getEthBalance: (address) => electron.ipcRenderer.invoke("wallet:getEthBalance", address),
-  getTokenBalances: (address) => electron.ipcRenderer.invoke("wallet:getTokenBalances", address),
+  getChainBalances: (address) => electron.ipcRenderer.invoke("wallet:getChainBalances", address),
   getSectionData: (section) => electron.ipcRenderer.invoke("wallet:getSectionData", section),
   generateMnemonic: () => electron.ipcRenderer.invoke("wallet:generateMnemonic"),
   validateMnemonic: (mnemonic) => electron.ipcRenderer.invoke("wallet:validateMnemonic", mnemonic),

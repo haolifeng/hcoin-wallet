@@ -2,6 +2,7 @@ import { Table, Typography, Alert, Spin } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { menuStore } from '../stores/MenuStore';
 import EthAccountCard from './EthAccountCard';
+import { formatAccountAddress } from '../utils/format';
 
 const { Title } = Typography;
 
@@ -32,6 +33,10 @@ const ContentPanel = observer(() => {
     title: COLUMN_LABEL[k] ?? k,
     dataIndex: k,
     key: k,
+    render:
+      k === 'address'
+        ? (value: string) => <span title={value}>{formatAccountAddress(value)}</span>
+        : undefined,
   }));
 
   return (

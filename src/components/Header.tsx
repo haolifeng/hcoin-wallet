@@ -2,14 +2,9 @@ import { Avatar, Button, Space, Typography } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { settingsStore } from '../stores/SettingsStore';
 import { startupStore } from '../stores/StartupStore';
+import { formatAccountAddress } from '../utils/format';
 
 const { Text } = Typography;
-
-/** 地址格式化：前 4 位 + 3 个点 + 后 4 位（如 0xAb...12Cd） */
-function formatAddress(address: string): string {
-  if (address.length <= 11) return address;
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
 
 /**
  * Header 内部内容：左（Logo）/ 右（用户区）。
@@ -42,7 +37,7 @@ const Header = observer(() => {
         </Button>
         <Avatar size="small" style={{ backgroundColor: '#1677ff' }}>H</Avatar>
         <Text style={{ color: 'rgba(255,255,255,0.85)' }}>
-          {address ? formatAddress(address) : '未登录'}
+          {address ? formatAccountAddress(address) : '未登录'}
         </Text>
       </Space>
     </div>
