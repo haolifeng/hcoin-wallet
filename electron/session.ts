@@ -6,7 +6,7 @@ import { getNetwork, type NetworkType } from './network';
 /**
  * 主进程内存中的当前解锁会话。
  * 私钥/钱包对象仅存在于主进程内存，绝不落盘、绝不通过 IPC 回传渲染进程。
- * 应用退出（窗口关闭即退出）后内存被回收，会话自然失效。
+ * 会话会因空闲超时、系统锁屏/休眠、手动锁定或应用退出而失效。
  */
 interface ActiveWallet {
   /** 钱包账户地址（数据库键） */
@@ -23,7 +23,18 @@ interface ActiveWallet {
   sol: SolAccount;
 }
 
+/** 会话被锁定的原因 */
+export type LockReason = 'idle' | 'screen-lock' | 'suspend' | 'manual' | 'quit';
+
+type LockListener = (reason: LockReason) => void;
+
 let activeWallet: ActiveWallet | null = null;
+let lockListener: LockListener | null = null;
+
+/** 注册锁定通知（主进程在锁定后通知渲染进程回到解锁界面） */
+export function setLockListener(listener: LockListener | null): void {
+  lockListener = listener;
+}
 
 /** 建立解锁会话（解锁成功 / 创建或导入账户成功后调用） */
 export function setActiveWallet(
@@ -45,7 +56,18 @@ export function getActiveBtcAccount(): BtcAccount | null {
   return activeWallet ? activeWallet.btc[getNetwork()] : null;
 }
 
-/** 清除解锁会话（锁定钱包 / 应用退出） */
+/** 清除解锁会话（应用退出） */
 export function clearActiveWallet(): void {
   activeWallet = null;
+}
+
+/**
+ * 锁定钱包：丢弃内存中的签名材料，并通知渲染进程。
+ * 未解锁时（或重复锁定）不触发通知。
+ */
+export function lockWallet(reason: LockReason): boolean {
+  if (!activeWallet) return false;
+  activeWallet = null;
+  lockListener?.(reason);
+  return true;
 }

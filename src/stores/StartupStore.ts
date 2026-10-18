@@ -166,6 +166,53 @@ class StartupStore {
   }
 
   /**
+   * 清空会话并回到解锁界面。
+   * 只在主进程确认已锁定（或用户主动锁定）后调用——真正的密钥销毁发生在主进程。
+   */
+  lock(): void {
+    runInAction(() => {
+      this.account = null;
+      this.password = '';
+      this.chainBalances = {};
+      this.balanceLoading = false;
+      this.error = null;
+      if (this.accounts.length > 0) {
+        this.phase = 'unlock';
+      } else {
+        this.phase = 'choose';
+      }
+    });
+  }
+
+  /**
+   * 主进程通知锁定（空闲超时 / 锁屏 / 休眠 / 手动），同步界面状态。
+   * 需要重新拉取账户列表：新建账户后若未刷新过列表，不能错误地回到「创建/导入」界面。
+   */
+  async handleLocked(): Promise<void> {
+    this.lock();
+    try {
+      const accounts = (await window.walletAPI?.listAccounts?.()) ?? [];
+      const withSecret = accounts.filter((a) => a.hasSecret);
+      runInAction(() => {
+        this.accounts = withSecret;
+        if (withSecret.length > 0) {
+          this.selectedAddress = withSecret[0].address;
+          this.phase = 'unlock';
+        } else {
+          this.phase = 'choose';
+        }
+      });
+    } catch {
+      // 拉取失败时沿用现有状态（lock() 已按本地列表兜底）
+    }
+  }
+
+  /** 用户主动锁定：交由主进程销毁内存中的私钥，锁定事件会回推到此处 */
+  async lockManually(): Promise<void> {
+    await window.walletAPI?.lock?.();
+  }
+
+  /**
    * 轮询读取当前账户的各链余额（ETH / AVAX / USDT / USDC）：
    * 通过 IPC 查询主进程数据库。
    * 未解锁、非 Electron 环境或查询失败时静默跳过，保留上一次的值。

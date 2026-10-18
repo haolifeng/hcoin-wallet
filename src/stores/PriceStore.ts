@@ -31,7 +31,8 @@ class PriceStore {
 
     this.loading = true;
     try {
-      const res = await fetch(url);
+      // 超时保护：行情接口不可用时不应让请求悬挂
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as Record<string, { usd?: number }>;
       runInAction(() => {

@@ -158,6 +158,34 @@ const SendModal = observer(() => {
               style={{ marginTop: 4 }}
             />
           </div>
+
+          {store.to.trim() && (
+            <div style={{ marginTop: 12 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {t('send.addressCheck')}
+              </Text>
+              <div style={{ marginTop: 4 }}>
+                <Text code strong style={{ color: '#cf1322', wordBreak: 'break-all' }}>
+                  {`${store.to.trim().slice(0, 8)}…${store.to.trim().slice(-8)}`}
+                </Text>
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 12 }}>
+            <Text strong>{t('send.password')}</Text>
+            <Input.Password
+              value={store.password}
+              placeholder={t('send.passwordPlaceholder')}
+              onChange={(e) => store.setPassword(e.target.value)}
+              style={{ marginTop: 4 }}
+            />
+            <div style={{ marginTop: 4 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {t('send.passwordHint')}
+              </Text>
+            </div>
+          </div>
         </>
       )}
     </Modal>

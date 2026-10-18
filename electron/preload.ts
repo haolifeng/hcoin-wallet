@@ -30,5 +30,16 @@ contextBridge.exposeInMainWorld('walletAPI', {
     asset: string;
     to: string;
     amount: string;
+    /** 支付密码：主进程校验通过后才会签名 */
+    password: string;
   }) => ipcRenderer.invoke('wallet:send', params),
+  lock: () => ipcRenderer.invoke('wallet:lock'),
+  /** 订阅「钱包被锁定」事件（空闲超时 / 锁屏 / 休眠 / 手动），返回取消订阅函数 */
+  onLocked: (callback: (reason: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, reason: string) => callback(reason);
+    ipcRenderer.on('wallet:locked', listener);
+    return () => {
+      ipcRenderer.removeListener('wallet:locked', listener);
+    };
+  },
 });

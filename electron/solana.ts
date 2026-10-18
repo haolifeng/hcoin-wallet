@@ -139,7 +139,11 @@ function solToLamports(amount: string): number {
     throw new Error(t('err.amountFormat'));
   }
   const [intPart, fracPart = ''] = trimmed.split('.');
-  const frac = `${fracPart}000000000`.slice(0, 9);
+  // 精度必须显式拒绝，不能静默截断
+  if (fracPart.length > 9) {
+    throw new Error(t('err.amountPrecision', { digits: 9 }));
+  }
+  const frac = fracPart.padEnd(9, '0');
   const lamports = BigInt(intPart) * LAMPORTS_PER_SOL_BI + BigInt(frac);
   if (lamports <= 0n) {
     throw new Error(t('err.amountPositive'));

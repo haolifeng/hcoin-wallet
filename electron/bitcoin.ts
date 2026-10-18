@@ -114,7 +114,11 @@ export function btcToSats(amount: string): bigint {
     throw new Error(t('err.amountFormat'));
   }
   const [intPart, fracPart = ''] = trimmed.split('.');
-  const frac = `${fracPart}00000000`.slice(0, 8);
+  // 精度必须显式拒绝，不能静默截断（否则用户以为转了 1.123456789，实际只转 1.12345678）
+  if (fracPart.length > 8) {
+    throw new Error(t('err.amountPrecision', { digits: 8 }));
+  }
+  const frac = fracPart.padEnd(8, '0');
   return BigInt(intPart) * SATS_PER_BTC + BigInt(frac);
 }
 
@@ -123,8 +127,15 @@ function satsToBtc(sats: bigint): number {
   return Number(sats) / Number(SATS_PER_BTC);
 }
 
+/** 外部 API 请求超时（毫秒），避免网络挂起导致轮询与发送流程卡死 */
+const REQUEST_TIMEOUT_MS = 15_000;
+/** 手续费率上限（sat/vB）：防止被恶意/异常节点返回的天价费率吞掉余额 */
+const MAX_FEE_RATE = 1000;
+
 async function apiGet<T>(apiBase: string, path: string): Promise<T> {
-  const res = await fetch(`${apiBase}${path}`);
+  const res = await fetch(`${apiBase}${path}`, {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(t('err.btcApiFailed', { status: res.status, statusText: res.statusText }));
   }
@@ -167,7 +178,8 @@ export async function fetchBtcBalance(
 /** 获取建议费率（sat/vB），取半小时确认档作为折中 */
 async function fetchFeeRate(apiBase: string): Promise<number> {
   const fees = await apiGet<RecommendedFees>(apiBase, '/v1/fees/recommended');
-  return Math.max(1, fees.halfHourFee || fees.fastestFee || 1);
+  // 同时限制上下界：费率由第三方 API 提供，不能无上限信任
+  return Math.min(MAX_FEE_RATE, Math.max(1, fees.halfHourFee || fees.fastestFee || 1));
 }
 
 /**
@@ -241,6 +253,7 @@ export async function sendBtc(
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: tx.hex,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');

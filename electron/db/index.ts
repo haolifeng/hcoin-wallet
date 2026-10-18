@@ -2,7 +2,7 @@ import { ClassicLevel } from 'classic-level';
 import {
   createHash,
   randomBytes,
-  scryptSync,
+  scrypt,
   createCipheriv,
   createDecipheriv,
 } from 'node:crypto';
@@ -27,9 +27,29 @@ export interface EncryptedSecret {
   scrypt: { N: number; r: number; p: number };
 }
 
-/** scrypt 派生参数（N=16384, r=8, p=1 ≈ 16MB 内存，满足 Node 默认 maxmem） */
-const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
+/**
+ * scrypt 派生参数（N=131072, r=8, p=1 ≈ 128MB 内存）。
+ * 相比旧的 N=16384（≈16MB）离线爆破成本提高约 8 倍；
+ * 旧数据解密时使用密文中记录的参数，因此提升参数不会导致老账户无法解锁。
+ */
+const SCRYPT_PARAMS = { N: 131072, r: 8, p: 1 };
 const KEY_LENGTH = 32;
+/** scrypt 的 maxmem 上限（128 * N * r = 128MB，需留出余量；Node 默认 32MB 会导致直接报错） */
+const SCRYPT_MAXMEM = 256 * 1024 * 1024;
+
+/** 异步派生密钥：避免 scrypt 阻塞主进程（阻塞期间窗口与其它 IPC 都会卡住） */
+function deriveKey(
+  password: string,
+  salt: Buffer,
+  params: { N: number; r: number; p: number },
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, KEY_LENGTH, { ...params, maxmem: SCRYPT_MAXMEM }, (err, key) => {
+      if (err) reject(err);
+      else resolve(key);
+    });
+  });
+}
 
 /** 单条链的余额：原生代币 + 各 ERC-20 代币 */
 export interface ChainBalance {
@@ -207,9 +227,9 @@ export function deriveAddress(mnemonic: string): string {
 }
 
 /** scrypt 派生密钥 + AES-256-GCM 加密助记词 */
-function encryptMnemonic(mnemonic: string, password: string): EncryptedSecret {
+async function encryptMnemonic(mnemonic: string, password: string): Promise<EncryptedSecret> {
   const salt = randomBytes(16);
-  const key = scryptSync(password, salt, KEY_LENGTH, SCRYPT_PARAMS);
+  const key = await deriveKey(password, salt, SCRYPT_PARAMS);
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const ciphertext = Buffer.concat([cipher.update(mnemonic, 'utf8'), cipher.final()]);
@@ -248,7 +268,7 @@ export async function createAccount(
     throw new Error(t('err.accountExists'));
   }
 
-  const secret = encryptMnemonic(mnemonic, password);
+  const secret = await encryptMnemonic(mnemonic, password);
   // 助记词此刻仍是明文，趁此派生 ETH / BTC / SOL 账户；派生后不再持有明文引用。
   // BTC 主网与测试网的派生路径不同，两个地址都落库，切换网络时无需再次解密助记词
   const eth = deriveEthAccount(mnemonic);
@@ -435,7 +455,7 @@ export async function decryptMnemonic(address: string, password: string): Promis
 
   const { salt, iv, tag, ciphertext, scrypt: params } = account.secret;
   try {
-    const key = scryptSync(password, Buffer.from(salt, 'base64'), KEY_LENGTH, params);
+    const key = await deriveKey(password, Buffer.from(salt, 'base64'), params);
     const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64'));
     decipher.setAuthTag(Buffer.from(tag, 'base64'));
     return Buffer.concat([
@@ -444,6 +464,19 @@ export async function decryptMnemonic(address: string, password: string): Promis
     ]).toString('utf8');
   } catch {
     throw new Error(t('err.wrongPassword'));
+  }
+}
+
+/**
+ * 校验密码是否正确（只有 GCM 认证通过才返回 true）。
+ * 用于签名等敏感操作前的二次认证：明文助记词不会离开本函数。
+ */
+export async function verifyPassword(address: string, password: string): Promise<boolean> {
+  try {
+    await decryptMnemonic(address, password);
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -52,6 +52,8 @@ export interface SendParams {
   asset: string;
   to: string;
   amount: string;
+  /** 支付密码：由主进程校验，校验通过后才签名广播 */
+  password: string;
 }
 
 declare global {
@@ -85,6 +87,10 @@ declare global {
       hasMnemonic: () => Promise<MnemonicState>;
       unlockWallet: (address: string, password: string) => Promise<UnlockResult>;
       send: (params: SendParams) => Promise<string>;
+      /** 手动锁定钱包（丢弃主进程内存中的私钥） */
+      lock: () => Promise<boolean>;
+      /** 订阅锁定事件，返回取消订阅函数 */
+      onLocked: (callback: (reason: string) => void) => () => void;
     };
   }
 }

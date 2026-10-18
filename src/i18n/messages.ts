@@ -23,6 +23,7 @@ const zh = {
   'common.next': '下一步',
   'common.continue': '继续',
   'common.settings': '设置',
+  'common.lock': '锁定',
   'common.send': '发送',
   'common.password': '密码',
   'common.confirmPassword': '确认密码',
@@ -159,7 +160,7 @@ const zh = {
   'content.addressLabel': '{symbol} 地址',
   'content.network': '网络',
   'content.derivationPath': '派生路径',
-  'content.walletAccount': '钱包账户',
+  'content.walletAccount': '本地账户标识（请勿用作收款地址）',
   'content.subtotal': '小计（USD）',
 
   // —— 发送 ——
@@ -175,6 +176,10 @@ const zh = {
   'send.amountPlaceholder': '请输入发送的 {asset} 数量',
   'send.mainnetAlertTitle': '{symbol} 为主网，使用真实资金',
   'send.mainnetAlertDesc': '交易一旦广播不可撤销，请务必核对接收地址与数量。',
+  'send.password': '支付密码',
+  'send.passwordPlaceholder': '签名前请输入密码',
+  'send.passwordHint': '签名前需再次验证密码，防止会话被劫持后静默转账。',
+  'send.addressCheck': '请再次核对收款地址首尾字符',
 
   // —— 右侧广告位 ——
   'right.ad': '广告',
@@ -236,6 +241,7 @@ const zh = {
   'err.btcApiFailed': 'BTC API 请求失败：{status} {statusText}',
   'err.broadcastFailed': '广播失败：{status} {detail}',
   'err.amountFormat': '发送数量格式不正确',
+  'err.amountPrecision': '数量小数位不能超过 {digits} 位',
   'err.amountPositive': '请输入有效的发送数量',
   'err.enterRecipient': '请输入接收地址',
   'err.noUtxo': '可用余额为 0，无法发送',
@@ -243,6 +249,8 @@ const zh = {
   'err.solAddressInvalid': '无效的 Solana 收款地址',
   'err.walletLocked': '钱包未解锁，无法发送',
   'err.accountMismatch': '当前解锁账户与发送账户不一致',
+  'err.tooManyAttempts': '密码错误次数过多，请在 {seconds} 秒后重试',
+  'err.walletAutoLocked': '钱包已锁定，请重新输入密码以继续',
 };
 
 export type MessageKey = keyof typeof zh;
@@ -255,6 +263,7 @@ const en: Record<MessageKey, string> = {
   'common.next': 'Next',
   'common.continue': 'Continue',
   'common.settings': 'Settings',
+  'common.lock': 'Lock',
   'common.send': 'Send',
   'common.password': 'Password',
   'common.confirmPassword': 'Confirm password',
@@ -393,7 +402,7 @@ const en: Record<MessageKey, string> = {
   'content.addressLabel': '{symbol} address',
   'content.network': 'Network',
   'content.derivationPath': 'Derivation path',
-  'content.walletAccount': 'Wallet account',
+  'content.walletAccount': 'Local account ID (not a receive address)',
   'content.subtotal': 'Subtotal (USD)',
 
   // —— 发送 ——
@@ -410,6 +419,11 @@ const en: Record<MessageKey, string> = {
   'send.mainnetAlertTitle': '{symbol} is on mainnet and uses real funds',
   'send.mainnetAlertDesc':
     'Transactions cannot be reversed once broadcast. Please verify the recipient address and amount.',
+  'send.password': 'Payment password',
+  'send.passwordPlaceholder': 'Enter your password to sign',
+  'send.passwordHint':
+    'Your password is verified before signing, so a hijacked session cannot transfer funds silently.',
+  'send.addressCheck': 'Double-check the first and last characters of the recipient address',
 
   // —— 右侧广告位 ——
   'right.ad': 'Ad',
@@ -471,6 +485,7 @@ const en: Record<MessageKey, string> = {
   'err.btcApiFailed': 'BTC API request failed: {status} {statusText}',
   'err.broadcastFailed': 'Broadcast failed: {status} {detail}',
   'err.amountFormat': 'Invalid amount format',
+  'err.amountPrecision': 'Amount cannot have more than {digits} decimal places',
   'err.amountPositive': 'Enter a valid amount',
   'err.enterRecipient': 'Enter the recipient address',
   'err.noUtxo': 'Available balance is 0, nothing to send',
@@ -478,6 +493,8 @@ const en: Record<MessageKey, string> = {
   'err.solAddressInvalid': 'Invalid Solana recipient address',
   'err.walletLocked': 'Wallet is locked, cannot send',
   'err.accountMismatch': 'The unlocked account does not match the sender',
+  'err.tooManyAttempts': 'Too many failed attempts, try again in {seconds}s',
+  'err.walletAutoLocked': 'Wallet locked, please enter your password to continue',
 };
 
 export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { zh, en };

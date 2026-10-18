@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Layout } from 'antd';
+import { Layout, message } from 'antd';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import SideMenu from './components/SideMenu';
@@ -37,6 +37,15 @@ export default function App() {
   // 同步主进程持久化的网络环境（主网 / 测试网）
   useEffect(() => {
     void networkStore.init();
+  }, []);
+
+  // 主进程锁定钱包（空闲超时 / 系统锁屏 / 休眠 / 手动锁定）后，界面回到解锁状态
+  useEffect(() => {
+    const off = window.walletAPI?.onLocked?.(() => {
+      void startupStore.handleLocked();
+      message.warning(localeStore.t('err.walletAutoLocked'));
+    });
+    return () => off?.();
   }, []);
 
   // 全局拉取币种价格（总览 / 单链视图共用）

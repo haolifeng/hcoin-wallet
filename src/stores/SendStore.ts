@@ -21,6 +21,8 @@ class SendStore {
   asset = 'ETH';
   to = '';
   amount = '';
+  /** 支付密码：仅存于内存，签名时交给主进程校验，发送结束即清空 */
+  password = '';
   sending = false;
   error: string | null = null;
   /** 发送成功后的交易哈希 */
@@ -45,6 +47,7 @@ class SendStore {
     this.visible = true;
     this.to = '';
     this.amount = '';
+    this.password = '';
     this.error = null;
     this.txHash = null;
   }
@@ -56,6 +59,7 @@ class SendStore {
     this.txHash = null;
     this.to = '';
     this.amount = '';
+    this.password = '';
     this.lockAsset = false;
   }
 
@@ -77,6 +81,10 @@ class SendStore {
 
   setAmount(value: string): void {
     this.amount = value;
+  }
+
+  setPassword(value: string): void {
+    this.password = value;
   }
 
   /** 当前选中链的展示配置（随网络环境变化） */
@@ -107,6 +115,7 @@ class SendStore {
       Boolean(this.to.trim()) &&
       Number.isFinite(value) &&
       value > 0 &&
+      this.password.length > 0 &&
       !this.sending
     );
   }
@@ -129,10 +138,12 @@ class SendStore {
         asset: this.asset,
         to: this.to.trim(),
         amount: this.amount.trim(),
+        password: this.password,
       });
       runInAction(() => {
         this.txHash = hash;
         this.sending = false;
+        this.password = ''; // 发送成功后立即丢弃内存中的密码
       });
       // 交易提交后刷新余额展示
       void startupStore.refreshBalances();

@@ -89,11 +89,11 @@ const ChainAccountCard = observer(({ chain }: { chain: ChainDisplay }) => {
         </div>
       </div>
       <div>
+        {/* 注意：这是本地账户标识（sha256(助记词) 前 8 位），不是任何链上的地址，
+            因此不提供复制，避免被误用作收款地址导致资金永久丢失。 */}
         <Text type="secondary">{t('content.walletAccount')}</Text>
         <div>
-          <Text code copyable={{ text: account.address }} title={account.address}>
-            {account.address}
-          </Text>
+          <Text code>{account.address}</Text>
         </div>
       </div>
     </Card>

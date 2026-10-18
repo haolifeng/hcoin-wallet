@@ -41,6 +41,11 @@ const Header = observer(() => {
         <Button size="small" onClick={() => settingsStore.openSettings()}>
           {t('common.settings')}
         </Button>
+        {startupStore.unlocked && (
+          <Button size="small" onClick={() => void startupStore.lockManually()}>
+            {t('common.lock')}
+          </Button>
+        )}
         <Avatar size="small" style={{ backgroundColor: '#1677ff' }}>H</Avatar>
         <Text style={{ color: 'rgba(255,255,255,0.85)' }}>
           {address ? formatAccountAddress(address) : t('header.notLoggedIn')}
