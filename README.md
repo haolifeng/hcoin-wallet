@@ -2,6 +2,8 @@
 
 基于 **Electron + Vite + React + MobX** 的桌面钱包应用。
 
+[简体中文](./README.md) | [English](./README_EN.md)
+
 ---
 
 ## 环境要求
